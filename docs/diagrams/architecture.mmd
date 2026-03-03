@@ -1,0 +1,50 @@
+graph TB
+    subgraph Telegram["Telegram"]
+        C[Contributors]
+        CC[Core Contributors<br/>Admin]
+    end
+
+    subgraph Bot["HR Agent Bot (Bun + grammy)"]
+        G[Gate<br/>Auth Check]
+        D[Discovery<br/>Skill Collection]
+        M[Matching<br/>Engine]
+        N[Negotiation<br/>Terms + Settlement]
+        R[Review<br/>Multi-Reviewer]
+        RES[Resolution<br/>Approve/Reject]
+        ADM[Admin Commands<br/>Opportunity CRUD]
+    end
+
+    subgraph External["External Services"]
+        CL[Claude API<br/>Anthropic]
+        GS[Google Sheets<br/>Database]
+        BA[Beta App API<br/>Collabberry]
+        BC[Arbitrum<br/>Blockchain]
+    end
+
+    C -->|/start| G
+    G -->|authorized| D
+    D -->|profile complete| M
+    M -->|matches found| N
+    N -->|submit| R
+    R -->|decided| RES
+    RES -->|approved| BA
+    BA -->|sign| BC
+
+    CC -->|/add_opportunity| ADM
+    CC -->|review DM| R
+
+    D <-->|extract profile| CL
+    N <-->|extract terms| CL
+    R <-->|aggregate feedback| CL
+    ADM <-->|extract opportunity| CL
+
+    G <-->|check auth| GS
+    D <-->|save contributor| GS
+    M <-->|read opportunities| GS
+    N <-->|save agreement| GS
+    R <-->|update status| GS
+    ADM <-->|CRUD opportunities| GS
+
+    style Telegram fill:#a5d8ff,stroke:#1971c2
+    style Bot fill:#eebefa,stroke:#9c36b5
+    style External fill:#99e9f2,stroke:#0c8599

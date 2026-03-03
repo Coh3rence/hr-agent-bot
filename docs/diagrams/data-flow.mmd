@@ -1,0 +1,52 @@
+sequenceDiagram
+    participant C as Contributor
+    participant Bot as HR Agent Bot
+    participant Claude as Claude API
+    participant Sheets as Google Sheets
+    participant CC as Core Contributors
+    participant Beta as Beta App
+
+    Note over C,Beta: Phase 1: Gate
+    C->>Bot: /start
+    Bot->>Sheets: Check AuthorizedUsers
+    Sheets-->>Bot: authorized ✓
+
+    Note over C,Beta: Phase 2: Discovery
+    Bot->>C: "Tell me about yourself"
+    C->>Bot: Skills, rate, availability (free text)
+    Bot->>Claude: extract_profile (tool use)
+    Claude-->>Bot: {name, skills[], rate, commitment%}
+    Bot->>Sheets: Save contributor profile
+
+    Note over C,Beta: Phase 3: Matching
+    Bot->>Sheets: Get open opportunities
+    Sheets-->>Bot: Opportunities list
+    Bot->>Bot: Run matching algorithm
+    Bot->>C: Top 3 matches with scores [Select]
+    C->>Bot: Selects opportunity
+
+    Note over C,Beta: Phase 4: Negotiation
+    Bot->>C: "Propose your terms"
+    C->>Bot: Rate, commitment, duration
+    Bot->>Claude: extract_terms (tool use)
+    Claude-->>Bot: {hourlyRate, commitment%, months}
+    Bot->>Bot: Calculate settlement likelihood
+    Bot->>Sheets: Save draft agreement
+    Bot->>C: "Rate: $70/hr, Likelihood: 78% [Submit] [Modify]"
+    C->>Bot: Submit
+
+    Note over C,Beta: Phase 5: Multi-Reviewer Aggregation
+    Bot->>Sheets: Update status → under_review
+    Bot->>CC: DM proposal [Approve/Counter/Reject]
+    CC->>Bot: Counter: $65/hr + feedback
+    CC->>Bot: Approve + feedback
+    Bot->>Claude: Aggregate feedback
+    Claude-->>Bot: Synthesized counter-offer
+    Bot->>C: "Team suggests $65/hr. Feedback: ..."
+    C->>Bot: Accept counter
+
+    Note over C,Beta: Phase 6: Resolution
+    Bot->>Sheets: Update status → approved
+    Bot->>Beta: POST /orgs/agreement
+    Beta-->>Bot: Agreement created
+    Bot->>C: "Welcome to the team!"

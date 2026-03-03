@@ -1,0 +1,23 @@
+stateDiagram-v2
+    [*] --> idle
+
+    idle --> gate: /start or message
+    gate --> idle: unauthorized (silent)
+    gate --> idle: on cooldown
+    gate --> discovery: authorized
+
+    discovery --> discovery: collecting info
+    discovery --> matching: profile complete
+    discovery --> idle: no opportunities
+
+    matching --> negotiation: opportunity selected
+
+    negotiation --> negotiation: modifying terms
+    negotiation --> review: submit for review
+
+    review --> review: collecting reviewer feedback
+    review --> negotiation: counter-offer (round 2)
+    review --> resolution: decision made
+
+    resolution --> idle: approved → Beta App
+    resolution --> idle: rejected → cooldown (3 days)
