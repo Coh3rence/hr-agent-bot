@@ -233,3 +233,43 @@ export async function handlePauseOpportunity(ctx: BotContext): Promise<void> {
     await ctx.reply(`Opportunity ${oppId} not found.`);
   }
 }
+
+export async function handleAuthorize(ctx: BotContext): Promise<void> {
+  const telegramId = ctx.from?.id?.toString();
+  if (!telegramId) return;
+
+  const isAdmin = await ctx.sheets.isAdmin(telegramId);
+  if (!isAdmin) {
+    await ctx.reply("You don't have admin permissions.");
+    return;
+  }
+
+  const args = ctx.message?.text?.replace("/authorize", "").trim().split(/\s+/);
+  if (!args || args.length < 1 || !args[0]) {
+    await ctx.reply(
+      "Usage: /authorize <telegram_id> [admin|contributor]\n\n" +
+        "Example: /authorize 123456789 contributor\n" +
+        "Default role: contributor"
+    );
+    return;
+  }
+
+  const targetId = args[0];
+  const role = (args[1] === "admin" ? "admin" : "contributor") as "admin" | "contributor";
+
+  const alreadyAuthorized = await ctx.sheets.isAuthorized(targetId);
+  if (alreadyAuthorized) {
+    await ctx.reply(`User ${targetId} is already authorized.`);
+    return;
+  }
+
+  await ctx.sheets.addAuthorizedUser(targetId, role);
+  await ctx.reply(`User ${targetId} authorized as ${role}.`);
+
+  // Try to notify them
+  try {
+    await ctx.api.sendMessage(targetId, "You've been authorized! Send /start to begin.");
+  } catch {
+    // User may need to message the bot first
+  }
+}

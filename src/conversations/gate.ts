@@ -1,12 +1,46 @@
 import type { BotContext } from "../bot";
+import { InlineKeyboard } from "grammy";
 
 export async function handleGate(ctx: BotContext): Promise<void> {
   const telegramId = ctx.from?.id?.toString();
   if (!telegramId) return;
 
-  // Check authorization - silently ignore unauthorized users
+  // Check authorization
   const isAuthorized = await ctx.sheets.isAuthorized(telegramId);
-  if (!isAuthorized) return;
+  if (!isAuthorized) {
+    await ctx.reply(
+      "Welcome! You're not authorized yet. An admin has been notified and can grant you access shortly."
+    );
+
+    // Notify all admins with authorize buttons
+    const adminIds = await ctx.sheets.getAdminIds();
+    const name = ctx.from?.first_name || "Unknown";
+    const handle = ctx.from?.username ? `@${ctx.from.username}` : "no username";
+
+    const keyboard = new InlineKeyboard()
+      .text("Authorize as Contributor", `auth:contributor:${telegramId}`)
+      .row()
+      .text("Authorize as Admin", `auth:admin:${telegramId}`)
+      .row()
+      .text("Ignore", `auth:ignore:${telegramId}`);
+
+    for (const adminId of adminIds) {
+      try {
+        await ctx.api.sendMessage(
+          adminId,
+          `New access request:\n\n` +
+            `Name: ${name}\n` +
+            `Username: ${handle}\n` +
+            `ID: \`${telegramId}\`\n\n` +
+            `Authorize this user?`,
+          { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+      } catch {
+        // Admin may not have started a DM with the bot yet
+      }
+    }
+    return;
+  }
 
   // Check if contributor is on cooldown
   const existing = await ctx.sheets.getContributor(telegramId);

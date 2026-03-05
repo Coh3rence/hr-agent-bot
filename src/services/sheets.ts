@@ -281,4 +281,25 @@ export class SheetsService {
     const rows = res.data.values || [];
     return rows.some((r) => r[0] === telegramId && r[1] === "admin");
   }
+
+  async getAdminIds(): Promise<string[]> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "AuthorizedUsers!A2:B",
+    });
+
+    const rows = res.data.values || [];
+    return rows.filter((r) => r[1] === "admin").map((r) => r[0]);
+  }
+
+  async addAuthorizedUser(telegramId: string, role: "admin" | "contributor"): Promise<void> {
+    await this.sheets.spreadsheets.values.append({
+      spreadsheetId: this.spreadsheetId,
+      range: "AuthorizedUsers!A:B",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[telegramId, role]],
+      },
+    });
+  }
 }
