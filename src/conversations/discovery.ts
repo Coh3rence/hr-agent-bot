@@ -1,12 +1,11 @@
 import type { BotContext } from "../bot";
-import { matchContributor } from "../services/matching";
 import { InlineKeyboard } from "grammy";
 import type { Contributor } from "../models/types";
 
 const DISCOVERY_SYSTEM_PROMPT = `You are an HR assistant for Collabberry, a DAO compensation platform. You're collecting information about a new contributor through natural conversation. Extract the following fields when mentioned:
 - name
-- skills (as array)
-- desired hourly rate (min and max)
+- skills (as array — be thorough, include specific technologies AND broader competencies)
+- desired hourly rate (min and max — if they give a single number, use it for both)
 - commitment percentage (100% = 40hrs/week)
 - timezone
 - location/country
@@ -93,30 +92,62 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
 
     ctx.session.contributorId = contributor.id;
 
-    // Run matching
+    // Show profile confirmation
+    const rateStr = contributor.desiredRate.min === contributor.desiredRate.max
+      ? `$${contributor.desiredRate.min}/hr`
+      : `$${contributor.desiredRate.min}-${contributor.desiredRate.max}/hr`;
+
+    await ctx.reply(
+      `Got it, ${contributor.name}! Here's your profile:\n\n` +
+        `**Skills:** ${contributor.skills.join(", ")}\n` +
+        `**Rate:** ${rateStr}\n` +
+        `**Commitment:** ${contributor.commitmentPercent}%\n` +
+        `**Location:** ${contributor.location} (${contributor.timezone})\n\n` +
+        `Finding the best opportunities for you...`,
+      { parse_mode: "Markdown" }
+    );
+
+    // Run AI-powered matching
     const opportunities = await ctx.sheets.getOpenOpportunities();
     if (opportunities.length === 0) {
       await ctx.reply(
-        "Thanks for your profile! Unfortunately, there are no open opportunities right now. We'll notify you when something opens up."
+        "Unfortunately, there are no open opportunities right now. We'll notify you when something opens up."
       );
       ctx.session.phase = "idle";
       return;
     }
 
-    const matches = matchContributor(contributor, opportunities);
+    const matches = await ctx.claude.matchOpportunities(contributor, opportunities);
+
+    if (matches.length === 0) {
+      await ctx.reply(
+        "I couldn't find strong matches right now. We'll keep your profile and notify you when a better fit opens up."
+      );
+      ctx.session.phase = "idle";
+      return;
+    }
+
     const topMatches = matches.slice(0, 3);
 
-    // Build opportunity cards
-    let message = `Great, ${contributor.name}! Here are your top matches:\n\n`;
+    // Build opportunity cards with AI explanations
+    let message = `Here are your top matches:\n\n`;
     const keyboard = new InlineKeyboard();
 
     for (const match of topMatches) {
+      const m = match as typeof match & { matchingSkills?: string[]; missingSkills?: string[] };
       const badge =
-        match.score >= 80 ? "🟢" : match.score >= 60 ? "🟡" : "🔴";
+        match.score >= 75 ? "🟢" : match.score >= 50 ? "🟡" : "🔴";
 
       message += `${badge} **${match.opportunity.title}** — ${match.score}% match\n`;
-      message += `Skills: ${match.breakdown.skillOverlap}% | Rate: ${match.breakdown.rateAlignment}% | Commitment: ${match.breakdown.commitmentFit}%\n`;
-      message += `${match.opportunity.description}\n\n`;
+
+      if (m.matchingSkills?.length) {
+        message += `Relevant skills: ${m.matchingSkills.join(", ")}\n`;
+      }
+      if (m.missingSkills?.length) {
+        message += `Could improve: ${m.missingSkills.join(", ")}\n`;
+      }
+
+      message += `${match.explanation}\n\n`;
 
       keyboard
         .text(

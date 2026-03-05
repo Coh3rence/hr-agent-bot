@@ -57,11 +57,85 @@ export async function handleGate(ctx: BotContext): Promise<void> {
     }
   }
 
+  // Returning contributor — skip discovery, go straight to matching
+  if (existing && existing.skills.length > 0) {
+    ctx.session.contributorId = existing.id;
+    ctx.session.messageHistory = [];
+
+    const rateStr = existing.desiredRate.min === existing.desiredRate.max
+      ? `$${existing.desiredRate.min}/hr`
+      : `$${existing.desiredRate.min}-${existing.desiredRate.max}/hr`;
+
+    await ctx.reply(
+      `Welcome back, ${existing.name}!\n\n` +
+        `**Your profile:**\n` +
+        `Skills: ${existing.skills.join(", ")}\n` +
+        `Rate: ${rateStr}\n` +
+        `Commitment: ${existing.commitmentPercent}%\n\n` +
+        `Finding the best opportunities for you...`,
+      { parse_mode: "Markdown" }
+    );
+
+    // Run AI matching
+    const opportunities = await ctx.sheets.getOpenOpportunities();
+    if (opportunities.length === 0) {
+      await ctx.reply("No open opportunities right now. We'll notify you when something opens up.");
+      ctx.session.phase = "idle";
+      return;
+    }
+
+    const matches = await ctx.claude.matchOpportunities(existing, opportunities);
+
+    if (matches.length === 0) {
+      await ctx.reply("No strong matches found right now. We'll keep your profile on file.");
+      ctx.session.phase = "idle";
+      return;
+    }
+
+    const topMatches = matches.slice(0, 3);
+    let message = `Here are your top matches:\n\n`;
+    const keyboard = new InlineKeyboard();
+
+    for (const match of topMatches) {
+      const m = match as typeof match & { matchingSkills?: string[]; missingSkills?: string[] };
+      const badge = match.score >= 75 ? "🟢" : match.score >= 50 ? "🟡" : "🔴";
+
+      message += `${badge} **${match.opportunity.title}** — ${match.score}% match\n`;
+
+      if (m.matchingSkills?.length) {
+        message += `Relevant skills: ${m.matchingSkills.join(", ")}\n`;
+      }
+      if (m.missingSkills?.length) {
+        message += `Could improve: ${m.missingSkills.join(", ")}\n`;
+      }
+
+      message += `${match.explanation}\n\n`;
+
+      keyboard
+        .text(
+          `${match.opportunity.title} (${match.score}%)`,
+          `select_opp:${match.opportunity.id}`
+        )
+        .row();
+    }
+
+    message += "Select an opportunity to start negotiating terms:";
+    ctx.session.phase = "matching";
+
+    await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
+    return;
+  }
+
+  // New contributor — start discovery
   ctx.session.phase = "discovery";
 
-  const greeting = existing
-    ? `Welcome back, ${existing.name}! I see you've been here before. Let's see what opportunities are available now.`
-    : `Welcome to Collabberry! I'm the HR agent here to help match you with the right opportunity.\n\nLet's start by getting to know you. Could you tell me:\n\n1. Your name\n2. Your key skills (e.g., Solidity, React, Community Management)\n3. Your desired hourly rate range\n4. Your availability as commitment % (100% = 40hrs/week)\n5. Your timezone`;
-
-  await ctx.reply(greeting);
+  await ctx.reply(
+    `Welcome to Collabberry! I'm the HR agent here to help match you with the right opportunity.\n\n` +
+      `Let's start by getting to know you. Could you tell me:\n\n` +
+      `1. Your name\n` +
+      `2. Your key skills (e.g., Solidity, React, Community Management)\n` +
+      `3. Your desired hourly rate range\n` +
+      `4. Your availability as commitment % (100% = 40hrs/week)\n` +
+      `5. Your timezone`
+  );
 }
