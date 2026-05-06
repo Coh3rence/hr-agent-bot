@@ -7,7 +7,7 @@ Chronological record of development decisions, progress, and learnings. For case
 ## Session 1 — 2026-03-03 (Project Setup)
 
 ### Context
-Client (Gustavo / RnDAO / Collabberry) accepted a $3,000 proposal for an HR AI Agent MVP — a Telegram bot for DAO contributor onboarding. 4-week timeline, 30 hours total.
+Client ([Coh3rence](https://github.com/Coh3rence/) / [Collabberry](https://github.com/collabberry/)) accepted a $3,000 proposal for an HR AI Agent MVP — a Telegram bot for DAO contributor onboarding. 4-week timeline, 30 hours total.
 
 ### Client Communication
 - Sent design questions document to Gustavo (Feb 2026)

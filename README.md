@@ -1,6 +1,6 @@
 # Collabberry HR AI Agent Bot
 
-An AI-powered Telegram bot that automates DAO contributor onboarding for [Collabberry](https://collabberry.xyz). Built by [Prosperity Labs](https://github.com/Prosperity-Labs) for [RnDAO](https://rndao.io).
+An AI-powered Telegram bot that automates DAO contributor onboarding for [Collabberry](https://github.com/collabberry/). Built by [Prosperity Labs](https://github.com/Prosperity-Labs).
 
 The bot guides contributors through a structured 6-phase flow: **authorization -> skill discovery -> opportunity matching -> compensation negotiation -> core team review -> resolution** -- replacing manual back-and-forth with AI-assisted conversations.
 
@@ -199,4 +199,9 @@ See [docs/DELIVERY-STATUS.md](docs/DELIVERY-STATUS.md) for the full breakdown. I
 
 ## License
 
-Private. Built for RnDAO / Collabberry by Prosperity Labs.
+This project is licensed under the **HR Agent Bot Source Available License v1.0**. See [LICENSE](LICENSE) for full terms.
+
+In short:
+- Free to use for personal projects, research, and non-commercial DAO operations.
+- Commercial use (e.g. offering this as a hosted SaaS product to third parties) requires written permission.
+- Third-party components — including the [Collabberry](https://github.com/collabberry/) platform APIs this bot integrates with — retain their own licenses (MIT).

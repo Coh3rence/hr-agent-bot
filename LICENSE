@@ -1,0 +1,86 @@
+HR Agent Bot Source Available License v1.0
+
+Copyright (c) 2025 Prosperity Labs
+
+---
+
+## Third-Party Acknowledgements
+
+This software integrates with the Collabberry platform
+(https://github.com/collabberry/), whose components are licensed under the
+MIT License. Those components retain their original MIT License terms and
+copyright notices. No Collabberry source code is reproduced in this
+repository; integration is performed solely via their published APIs.
+
+---
+
+## License Terms for This Repository
+
+### 1. Definitions
+
+"Software" means the source code, documentation, and all other files in this
+repository, excluding third-party dependencies installed via a package manager.
+
+"Non-Commercial Use" means use that is not primarily intended for or directed
+toward commercial advantage or monetary compensation. This includes:
+  - Personal projects and experimentation
+  - Academic research and education
+  - Internal use by open-source communities and DAOs that do not charge
+    third parties for access to the Software or its functionality
+
+"Commercial Use" means any use where the Software, or a product substantially
+derived from the Software, is offered to third parties for a fee, as a hosted
+service, as part of a paid product, or in any context primarily intended for
+commercial advantage.
+
+"You" means the individual or legal entity exercising rights under this License.
+
+### 2. Grant of Rights
+
+Subject to the conditions below, Prosperity Labs grants You a worldwide,
+royalty-free, non-exclusive license to:
+
+  a) Use, copy, and run the Software for Non-Commercial Use;
+  b) Modify the Software and create derivative works for Non-Commercial Use;
+  c) Distribute copies of the Software or derivative works under the same
+     license terms, provided this license notice is retained in full.
+
+### 3. Conditions
+
+  a) **Attribution.** All copies or substantial portions of the Software must
+     include this license notice and the original copyright notice.
+
+  b) **Non-Commercial Restriction.** Commercial Use of the Software requires
+     a separate written commercial license from Prosperity Labs. To inquire,
+     open an issue or contact the maintainers via the repository.
+
+  c) **No Sublicensing.** You may not grant Commercial Use rights to others.
+
+  d) **Share-Alike for Derivatives.** If You distribute a modified version of
+     the Software, it must be distributed under these same license terms.
+
+### 4. Future Open Source Conversion
+
+Releases of the Software that are more than two (2) years old automatically
+become available under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). For clarity, the "release
+date" of any given version is the date its source code was first published in
+this repository.
+
+This clause ensures the long-term openness of the codebase while preserving
+a window for the original authors to capture commercial value.
+
+### 5. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+
+---
+
+For commercial licensing inquiries, open an issue at:
+https://github.com/Coh3rence/hr-agent-bot/issues
