@@ -44,12 +44,11 @@
 | **Hosting** | Railway | Auto-deploy from GitHub, env vars, logs, $5/mo |
 | **Validation** | Zod | Runtime type safety for env config and API payloads |
 
-### Why NOT Eliza Framework?
-The original Collabberry repo (sepu85/HR_AI_Agent) uses Eliza — a general-purpose AI character framework. We decided against forking it because:
-- The 6-phase negotiation flow is too structured for a character bot
-- grammy gives us explicit conversation state management
-- Claude tool use gives us structured data extraction (not just chat)
-- Less framework overhead, more control over the flow
+### Framework Choice: grammy + Claude SDK
+Collabberry's existing AI agent repo uses Eliza, a general-purpose AI character framework. For this bot we chose grammy with the Claude SDK directly because:
+- Explicit conversation state management fits the 6-phase structured flow
+- Claude tool use enables structured data extraction alongside chat
+- A focused single-purpose bot benefits from a lighter dependency surface
 
 ## Data Flow
 
