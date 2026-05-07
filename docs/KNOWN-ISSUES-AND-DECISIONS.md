@@ -34,7 +34,7 @@
 
 ### 5. Match Parameters
 - Matching happens by: **semantic skill match**, **skill overlap**, and **hourly rate alignment**
-- Skill matching should be semantic (not just substring) — e.g., "frontend dev" should match "React"
+- Semantic matching is implemented via Claude tool use — e.g., "frontend dev" matches "React" even though the strings differ
 
 ### 6. Missing Parameter: Equity Points
 - Currently missing from the model: **equity vs. fiat split**
