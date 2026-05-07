@@ -3,7 +3,6 @@
 **Project:** HR AI Agent MVP for Collabberry
 **Client:** [Coh3rence](https://github.com/Coh3rence/) / [Collabberry](https://github.com/collabberry/)
 **Developer:** Prosperity Labs
-**Budget:** 30 hours
 
 ---
 
