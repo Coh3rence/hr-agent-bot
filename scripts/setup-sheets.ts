@@ -64,7 +64,7 @@ async function main() {
   console.log(`Existing tabs: ${existingTabs.join(", ") || "(none)"}`);
 
   // Add missing tabs
-  const requiredTabs = ["Opportunities", "Contributors", "Agreements", "AuthorizedUsers"];
+  const requiredTabs = ["Opportunities", "Contributors", "Agreements", "AuthorizedUsers", "ReviewFeedback"];
   const tabsToAdd = requiredTabs.filter((t) => !existingTabs.includes(t));
 
   if (tabsToAdd.length > 0) {
@@ -128,6 +128,13 @@ async function main() {
         {
           range: "AuthorizedUsers!A1:B1",
           values: [["telegramId", "role"]],
+        },
+        {
+          range: "ReviewFeedback!A1:G1",
+          values: [[
+            "agreementId", "reviewerId", "reviewerName", "decision",
+            "suggestedRate", "qualitativeFeedback", "submittedAt",
+          ]],
         },
       ],
     },

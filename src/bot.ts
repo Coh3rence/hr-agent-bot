@@ -46,6 +46,8 @@ bot.use(
       selectedOpportunityId: null,
       currentAgreementId: null,
       messageHistory: [],
+      pendingReviewAgreementId: null,
+      pendingReviewDecision: null,
     }),
   })
 );
@@ -71,6 +73,7 @@ bot.on("message:text", async (ctx) => {
     matching: handleDiscovery,
     negotiation: handleNegotiation,
     review: handleReview,
+    reviewer_feedback: handleReview,
     resolution: handleResolution,
   };
 

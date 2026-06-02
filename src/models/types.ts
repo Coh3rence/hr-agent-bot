@@ -78,6 +78,7 @@ export type ConversationPhase =
   | "matching"
   | "negotiation"
   | "review"
+  | "reviewer_feedback"
   | "resolution";
 
 export interface SessionData {
@@ -86,4 +87,6 @@ export interface SessionData {
   selectedOpportunityId: string | null;
   currentAgreementId: string | null;
   messageHistory: { role: "user" | "assistant"; content: string }[];
+  pendingReviewAgreementId: string | null;
+  pendingReviewDecision: "counter" | "reject" | null;
 }

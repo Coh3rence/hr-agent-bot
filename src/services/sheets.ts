@@ -1,6 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import type { Env } from "../config";
-import type { Opportunity, Contributor, Agreement } from "../models/types";
+import type { Opportunity, Contributor, Agreement, ReviewerFeedback } from "../models/types";
 
 export class SheetsService {
   private sheets!: sheets_v4.Sheets;
@@ -212,7 +212,61 @@ export class SheetsService {
     return true;
   }
 
+  async getContributorById(id: string): Promise<Contributor | null> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Contributors!A2:M",
+    });
+
+    const row = (res.data.values || []).find((r) => r[0] === id);
+    if (!row) return null;
+
+    return {
+      id: row[0],
+      telegramId: row[1],
+      telegramHandle: row[2],
+      name: row[3],
+      skills: (row[4] || "").split(",").map((s: string) => s.trim()),
+      commitmentPercent: Number(row[5]),
+      desiredRate: { min: Number(row[6]), max: Number(row[7]) },
+      timezone: row[8] || "",
+      location: row[9] || "",
+      status: row[10] as Contributor["status"],
+      cooldownUntil: row[11] || null,
+      previousAttempts: Number(row[12]) || 0,
+      createdAt: row[13] || "",
+    };
+  }
+
   // --- Agreements ---
+
+  async getAgreement(id: string): Promise<Agreement | null> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:L",
+    });
+
+    const row = (res.data.values || []).find((r) => r[0] === id);
+    if (!row) return null;
+
+    return {
+      id: row[0],
+      opportunityId: row[1],
+      contributorId: row[2],
+      roleName: row[3],
+      responsibilities: row[4],
+      hourlyRate: Number(row[5]),
+      commitmentPercent: Number(row[6]),
+      durationMonths: Number(row[7]),
+      settlementLikelihood: Number(row[8]),
+      status: row[9] as Agreement["status"],
+      reviewerFeedback: [],
+      aggregatedCounterOffer: null,
+      negotiationRound: Number(row[10]) || 1,
+      submittedAt: row[11] || "",
+      reviewedAt: null,
+    };
+  }
 
   async addAgreement(agreement: Agreement): Promise<void> {
     await this.sheets.spreadsheets.values.append({
@@ -258,6 +312,50 @@ export class SheetsService {
       requestBody: { values: [[status]] },
     });
     return true;
+  }
+
+  // --- Review Feedback ---
+
+  async addReviewFeedback(
+    agreementId: string,
+    feedback: ReviewerFeedback
+  ): Promise<void> {
+    await this.sheets.spreadsheets.values.append({
+      spreadsheetId: this.spreadsheetId,
+      range: "ReviewFeedback!A:G",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [
+          [
+            agreementId,
+            feedback.reviewerId,
+            feedback.reviewerName,
+            feedback.decision,
+            feedback.suggestedRate ?? "",
+            feedback.qualitativeFeedback,
+            feedback.submittedAt,
+          ],
+        ],
+      },
+    });
+  }
+
+  async getReviewFeedbacks(agreementId: string): Promise<ReviewerFeedback[]> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "ReviewFeedback!A2:G",
+    });
+
+    return (res.data.values || [])
+      .filter((r) => r[0] === agreementId)
+      .map((r) => ({
+        reviewerId: r[1],
+        reviewerName: r[2] || "",
+        decision: r[3] as ReviewerFeedback["decision"],
+        suggestedRate: r[4] ? Number(r[4]) : null,
+        qualitativeFeedback: r[5] || "",
+        submittedAt: r[6] || "",
+      }));
   }
 
   // --- Authorized Users ---
