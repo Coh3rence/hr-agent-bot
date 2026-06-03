@@ -314,6 +314,30 @@ export class SheetsService {
     return true;
   }
 
+  async updateAgreementAggregation(
+    id: string,
+    aggregatedRate: number | null,
+    aggregatedSummary: string
+  ): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:A",
+    });
+
+    const rows = res.data.values || [];
+    const index = rows.findIndex((r) => r[0] === id);
+    if (index === -1) return false;
+
+    const rowNum = index + 2;
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `Agreements!M${rowNum}:N${rowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[aggregatedRate ?? "", aggregatedSummary]] },
+    });
+    return true;
+  }
+
   // --- Review Feedback ---
 
   async addReviewFeedback(
