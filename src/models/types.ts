@@ -55,9 +55,11 @@ export interface ReviewerFeedback {
 }
 
 export interface CounterOffer {
-  suggestedRate: number;
+  suggestedRate: number | null;
   qualitativeSummary: string;
+  outcome: "all_approve" | "mixed" | "all_reject";
   reviewerCount: number;
+  aggregationSig?: string;
 }
 
 export interface MatchResult {
