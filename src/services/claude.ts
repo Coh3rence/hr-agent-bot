@@ -1,6 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createHash } from "node:crypto";
 import type { Env } from "../config";
-import type { Contributor, Opportunity, MatchResult } from "../models/types";
+import type {
+  Contributor,
+  Opportunity,
+  MatchResult,
+  ReviewerFeedback,
+  CounterOffer,
+} from "../models/types";
 
 export class ClaudeService {
   private client: Anthropic;
@@ -171,30 +178,113 @@ Return matches sorted by overallScore descending.`;
   }
 
   async aggregateFeedback(
-    feedbacks: { reviewer: string; decision: string; rate: number | null; feedback: string }[]
-  ): Promise<{ suggestedRate: number; qualitativeSummary: string }> {
-    const rates = feedbacks
-      .map((f) => f.rate)
-      .filter((r): r is number => r !== null);
+    feedbacks: ReviewerFeedback[],
+    originalRate?: number
+  ): Promise<CounterOffer | null> {
+    const unique = dedupLatestPerReviewer(feedbacks);
+    if (unique.length === 0) return null;
 
-    const avgRate = rates.length > 0
-      ? Math.round(rates.reduce((a, b) => a + b, 0) / rates.length)
-      : 0;
+    const sig = aggregationSig(unique);
+    const decisions = unique.map((f) => f.decision);
+    const allApprove = decisions.every((d) => d === "approve");
+    const allReject = decisions.every((d) => d === "reject");
 
-    const feedbackText = feedbacks
-      .map((f) => `${f.reviewer} (${f.decision}): ${f.feedback}`)
+    // D-002: all-approve fast-path, no Claude call.
+    if (allApprove) {
+      return {
+        suggestedRate: originalRate ?? null,
+        qualitativeSummary: "All reviewers approved.",
+        outcome: "all_approve",
+        reviewerCount: unique.length,
+        aggregationSig: sig,
+      };
+    }
+
+    // D-005: all-reject fast-path, deterministic reason list, no Claude call.
+    if (allReject) {
+      const reasons = unique
+        .map((f) => f.qualitativeFeedback?.trim())
+        .filter((r): r is string => !!r);
+      return {
+        suggestedRate: null,
+        qualitativeSummary: reasons.length
+          ? `Reviewers declined. Reasons: ${reasons.join("; ")}.`
+          : "Reviewers declined without giving reasons.",
+        outcome: "all_reject",
+        reviewerCount: unique.length,
+        aggregationSig: sig,
+      };
+    }
+
+    // Single reviewer (must be a single counter at this point): pass-through, no Claude call.
+    if (unique.length === 1) {
+      const sole = unique[0]!;
+      return {
+        suggestedRate: sole.suggestedRate,
+        qualitativeSummary:
+          sole.qualitativeFeedback?.trim() || "(no feedback provided)",
+        outcome: "mixed",
+        reviewerCount: 1,
+        aggregationSig: sig,
+      };
+    }
+
+    // Mixed multi: D-001 mean of counter rates, Claude synthesis of qualitative.
+    const counterRates = unique
+      .filter((f) => f.decision === "counter" && f.suggestedRate !== null)
+      .map((f) => f.suggestedRate as number);
+    const meanRate =
+      counterRates.length > 0
+        ? Math.round(
+            counterRates.reduce((a, b) => a + b, 0) / counterRates.length
+          )
+        : null;
+
+    const feedbackText = unique
+      .map((f) => {
+        const stance =
+          f.decision === "approve"
+            ? "approved"
+            : f.decision === "counter"
+              ? `countered${f.suggestedRate !== null ? ` at $${f.suggestedRate}/hr` : ""}`
+              : "rejected";
+        return `Reviewer (${stance}): ${f.qualitativeFeedback?.trim() || "(no comment)"}`;
+      })
       .join("\n");
 
     const summary = await this.chat(
-      `You are an HR assistant synthesizing multiple reviewer opinions into a single coherent counter-offer message. Be concise, professional, and constructive. Do not reveal individual reviewer identities.`,
-      [
-        {
-          role: "user",
-          content: `Synthesize these reviewer feedbacks into one paragraph:\n\n${feedbackText}`,
-        },
-      ]
+      `You are an HR assistant synthesizing multiple reviewer opinions into a single concise counter-offer message for a contributor. Reflect the range of stances honestly, stay professional and constructive, and do not reveal individual reviewer identities. Respond in one paragraph.`,
+      [{ role: "user", content: `Synthesize:\n\n${feedbackText}` }]
     );
 
-    return { suggestedRate: avgRate, qualitativeSummary: summary };
+    return {
+      suggestedRate: meanRate,
+      qualitativeSummary: summary,
+      outcome: "mixed",
+      reviewerCount: unique.length,
+      aggregationSig: sig,
+    };
   }
+}
+
+function dedupLatestPerReviewer(feedbacks: ReviewerFeedback[]): ReviewerFeedback[] {
+  const latest = new Map<string, ReviewerFeedback>();
+  for (const f of feedbacks) {
+    const existing = latest.get(f.reviewerId);
+    if (!existing || f.submittedAt > existing.submittedAt) {
+      latest.set(f.reviewerId, f);
+    }
+  }
+  return [...latest.values()];
+}
+
+function aggregationSig(feedbacks: ReviewerFeedback[]): string {
+  const canonical = feedbacks
+    .map(
+      (f) =>
+        `${f.reviewerId}|${f.decision}|${f.suggestedRate ?? ""}|${f.qualitativeFeedback}|${f.submittedAt}`
+    )
+    .sort()
+    .join("\n");
+  return createHash("sha1").update(canonical).digest("hex").slice(0, 12);
 }
