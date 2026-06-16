@@ -27,9 +27,16 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     await ctx.reply("No problem. What would you like to change? You can update your rate, commitment %, or duration.");
   } else if (data.startsWith("review:approve:")) {
     const agreementId = data.replace("review:approve:", "");
-    await recordReviewerDecision(ctx, agreementId, "approve", null, "");
-    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
-    await ctx.reply("Approval recorded. Thanks.");
+    const ok = await recordReviewerDecision(ctx, agreementId, "approve", null, "");
+    if (ok) {
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+      await ctx.reply("Approval recorded. Thanks.");
+    } else {
+      // Keep the buttons in place so the reviewer can simply tap again.
+      await ctx.reply(
+        "Sorry — I couldn't record your approval just now. Please tap the button again in a moment. An admin has been notified."
+      );
+    }
   } else if (data.startsWith("review:counter:")) {
     const agreementId = data.replace("review:counter:", "");
     ctx.session.pendingReviewAgreementId = agreementId;
@@ -75,7 +82,16 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
     if (!qualitative) qualitative = "(no qualitative feedback provided)";
   }
 
-  await recordReviewerDecision(ctx, agreementId, decision, suggestedRate, qualitative);
+  const ok = await recordReviewerDecision(ctx, agreementId, decision, suggestedRate, qualitative);
+
+  if (!ok) {
+    // Keep the pending decision + phase so the reviewer can resend the same
+    // message to retry, rather than losing their feedback to a silent drop.
+    await ctx.reply(
+      "Sorry — I couldn't record that just now. Please send it again in a moment. An admin has been notified."
+    );
+    return;
+  }
 
   ctx.session.pendingReviewAgreementId = null;
   ctx.session.pendingReviewDecision = null;
@@ -94,7 +110,7 @@ async function recordReviewerDecision(
   decision: ReviewerFeedback["decision"],
   suggestedRate: number | null,
   qualitativeFeedback: string
-): Promise<void> {
+): Promise<boolean> {
   const reviewerId = ctx.from?.id?.toString() ?? "";
   const reviewerName =
     ctx.from?.first_name || ctx.from?.username || reviewerId;
@@ -110,8 +126,39 @@ async function recordReviewerDecision(
 
   try {
     await ctx.sheets.addReviewFeedback(agreementId, feedback);
+    return true;
   } catch (err) {
     console.error(`recordReviewerDecision: failed to write feedback for ${agreementId}:`, err);
+    await notifyAdminsOfWriteFailure(ctx, agreementId, reviewerName, decision, err);
+    return false;
+  }
+}
+
+async function notifyAdminsOfWriteFailure(
+  ctx: BotContext,
+  agreementId: string,
+  reviewerName: string,
+  decision: ReviewerFeedback["decision"],
+  err: unknown
+): Promise<void> {
+  const message =
+    `Could not record a reviewer decision.\n\n` +
+    `Agreement: ${agreementId}\n` +
+    `Reviewer: ${reviewerName}\n` +
+    `Decision: ${decision}\n` +
+    `Error: ${err instanceof Error ? err.message : String(err)}\n\n` +
+    `The reviewer was asked to retry. If this keeps happening, the ReviewFeedback ` +
+    `tab may be missing — run scripts/ensure-reviewfeedback-tab.ts.`;
+
+  try {
+    const adminIds = await ctx.sheets.getAdminIds();
+    for (const adminId of adminIds) {
+      await ctx.api.sendMessage(Number(adminId), message).catch((e) => {
+        console.error(`notifyAdminsOfWriteFailure: failed to DM admin ${adminId}:`, e);
+      });
+    }
+  } catch (e) {
+    console.error("notifyAdminsOfWriteFailure: could not load admin ids:", e);
   }
 }
 
