@@ -268,6 +268,31 @@ export class SheetsService {
     };
   }
 
+  /**
+   * Lightweight enumeration for the review timeout sweep. Returns one row per
+   * agreement with just the fields the sweep needs: its id, status, submit time,
+   * and whether an aggregation has already been written (column N non-empty).
+   * `aggregated` is the cross-sweep idempotency signal — once M/N is populated
+   * (by either the on-tap quorum trigger or a prior sweep), the review is done.
+   */
+  async listAgreementReviewState(): Promise<
+    { id: string; status: Agreement["status"]; submittedAt: string; aggregated: boolean }[]
+  > {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:N",
+    });
+
+    return (res.data.values || [])
+      .filter((row) => row[0])
+      .map((row) => ({
+        id: row[0],
+        status: row[9] as Agreement["status"],
+        submittedAt: row[11] || "",
+        aggregated: !!(row[13] && String(row[13]).trim()),
+      }));
+  }
+
   async addAgreement(agreement: Agreement): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,

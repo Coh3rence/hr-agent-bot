@@ -8,6 +8,7 @@ import { handleReview } from "./conversations/review";
 import { handleResolution } from "./conversations/resolution";
 import { SheetsService } from "./services/sheets";
 import { ClaudeService } from "./services/claude";
+import { sweepExpiredReviews, SWEEP_INTERVAL_MS } from "./services/timeout";
 import {
   handleAddOpportunity,
   handleListOpportunities,
@@ -132,10 +133,19 @@ bot.catch((err) => {
   console.error("Bot error:", err);
 });
 
+// Review timeout sweep (D-007): catch up on boot, then run on a fixed interval.
+// Errors are swallowed inside the sweep so a bad pass never crashes the bot.
+function startReviewTimeoutSweep() {
+  void sweepExpiredReviews(sheets, claude);
+  setInterval(() => void sweepExpiredReviews(sheets, claude), SWEEP_INTERVAL_MS);
+}
+
 // Start
 async function main() {
   await sheets.initialize();
   console.log("Google Sheets connected");
+  startReviewTimeoutSweep();
+  console.log(`Review timeout sweep scheduled every ${SWEEP_INTERVAL_MS / 60000} min`);
   console.log("Starting HR Agent Bot...");
   bot.start();
 }
