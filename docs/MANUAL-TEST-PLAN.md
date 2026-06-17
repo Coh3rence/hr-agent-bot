@@ -150,27 +150,57 @@ DM with Approve / Counter / Reject buttons.
 
 ---
 
-## Part D — Not yet shipped (verify when these land)
+## Part D — Timeout sweep (*iter-3e*, shipped) + not-yet-shipped (3f)
 
-### D1. 48h timeout → silence = approval — *iter-3e (planned)*
-- For testing, shorten the deadline/interval (or seed an Agreement with a
-  `submittedAt` already older than 48h).
-- **Expected:** outstanding (silent) reviewers are treated as approvals once the
-  deadline passes; the review aggregates with the responders' decisions +
-  implicit approvals. Idempotent with the C1 "everyone answered" trigger — no
-  double aggregation if both fire.
-- [ ] Pass (when iter-3e lands)
+> Easiest way to trigger the sweep without waiting 48h: in the test sheet, edit
+> the target Agreement's **submittedAt** (column L) to a timestamp >48h in the
+> past, leave its **status** (column J) = `under_review`, and make sure the
+> aggregation cells (columns M/N) are **empty**. Then restart the bot (startup
+> sweep fires immediately) or wait for the next 15-min tick.
 
-### D2. Process restart / downtime across a deadline — *iter-3e startup sweep (planned)*
-- **Steps:** submit a proposal, stop the bot, let the 48h deadline pass while it's
-  down, restart the bot.
+### D1. 48h timeout with partial responses → silence = approval — *iter-3e*
+- **Setup:** two reviewers; R1 has Countered, R2 stays silent. Backdate
+  `submittedAt` >48h; M/N empty.
+- **Steps:** restart the bot (or wait for a tick).
+- **Expected:** the sweep aggregates using the responders' decisions; the silent
+  reviewer is an implicit approval (carries no rate/objection, doesn't change the
+  bucket). M/N get written. Console logs `aggregated on timeout`.
+- [ ] Pass
+
+### D2. 48h timeout, every reviewer silent → default approval — *iter-3e*
+- **Setup:** an `under_review` agreement with **no** ReviewFeedback rows;
+  `submittedAt` backdated >48h; M/N empty.
+- **Steps:** restart the bot (or wait for a tick).
+- **Expected:** M = the original rate, N = "No reviewer responded within 48 hours;
+  approved by default." Console logs `approved by default (no responses)`. Claude
+  is **not** called.
+- [ ] Pass
+
+### D3. Idempotency — sweep does not double-fire / conflict with on-tap — *iter-3e*
+- **Steps:** after D1 or D2 has written M/N, leave the agreement `under_review`
+  and trigger the sweep again (restart / next tick). Separately: an agreement the
+  on-tap path already aggregated (Part C) — confirm the sweep leaves it alone.
+- **Expected:** the second sweep sees column N populated (`aggregated = true`) and
+  skips — no second write, no duplicate Claude call. Whoever wrote M/N first wins.
+- [ ] Pass
+
+### D4. Downtime across a deadline → bounded latency, correct outcome — *iter-3e startup sweep*
+- **Steps:** submit a proposal, stop the bot, backdate `submittedAt` >48h while
+  it's down (simulating the deadline passing during downtime), restart the bot.
 - **Expected:** the startup sweep re-reads the Agreements tab, sees the expired
-  review, and completes it. Downtime causes only bounded latency — never a lost or
-  wrong decision (because the deadline is stored on the sheet and silence =
-  approval makes a late firing produce the same outcome).
-- [ ] Pass (when iter-3e lands)
+  review, and completes it on boot. Downtime causes only bounded latency — never a
+  lost or wrong decision (deadline is stored on the sheet; silence = approval makes
+  a late firing produce the same outcome).
+- [ ] Pass
 
-### D3. Aggregated counter-offer presented to the contributor — *iter-3f (planned)*
+### D5. Bad submittedAt is not auto-approved — *iter-3e guard*
+- **Setup:** an `under_review` agreement with an empty/garbled `submittedAt`.
+- **Steps:** trigger the sweep.
+- **Expected:** the sweep logs a warning and **skips** it — no default approval on
+  an undeterminable deadline.
+- [ ] Pass
+
+### D6. Aggregated counter-offer presented to the contributor — *iter-3f (planned)*
 - **Expected:** after aggregation, the contributor is DM'd the counter-offer with
   Accept / Modify / Walk-away. Callback carries the agreement id; the session is
   rebuilt from the sheet if the contributor has no active session. Accept →
