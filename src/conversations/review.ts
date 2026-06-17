@@ -1,6 +1,8 @@
 import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
 import type { ReviewerFeedback } from "../models/types";
+import { isReviewComplete } from "../services/quorum";
+import { aggregateForAgreement } from "../services/aggregation";
 
 export async function handleReview(ctx: BotContext): Promise<void> {
   const data = ctx.callbackQuery?.data || ctx.message?.text || "";
@@ -31,6 +33,7 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     if (ok) {
       await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
       await ctx.reply("Approval recorded. Thanks.");
+      await maybeCompleteReview(ctx, agreementId);
     } else {
       // Keep the buttons in place so the reviewer can simply tap again.
       await ctx.reply(
@@ -102,6 +105,8 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
       ? `Counter-offer recorded${suggestedRate !== null ? ` at $${suggestedRate}/hr` : ""}. Thanks.`
       : `Rejection recorded. Thanks.`;
   await ctx.reply(summary);
+
+  await maybeCompleteReview(ctx, agreementId);
 }
 
 async function recordReviewerDecision(
@@ -175,8 +180,7 @@ async function notifyReviewers(ctx: BotContext, agreementId: string): Promise<vo
     return;
   }
 
-  const reviewerIds = await ctx.sheets.getAdminIds();
-  const recipients = reviewerIds.filter((id) => id !== contributor.telegramId);
+  const recipients = await getReviewRecipients(ctx, contributor.telegramId);
 
   if (recipients.length === 0) {
     console.warn(`notifyReviewers: no reviewers available for agreement ${agreementId}`);
@@ -211,4 +215,40 @@ async function notifyReviewers(ctx: BotContext, agreementId: string): Promise<vo
       console.error(`notifyReviewers: failed to DM ${reviewerId}:`, err);
     }
   }
+}
+
+/**
+ * The set of reviewers notified for an agreement: all admins except the
+ * contributor themselves. Shared by notifyReviewers and the completeness check
+ * so quorum is measured against exactly the people who were asked to review.
+ */
+async function getReviewRecipients(
+  ctx: BotContext,
+  contributorTelegramId: string
+): Promise<string[]> {
+  const reviewerIds = await ctx.sheets.getAdminIds();
+  return reviewerIds.filter((id) => id !== contributorTelegramId);
+}
+
+/**
+ * After a reviewer decision lands, aggregate if every notified reviewer has now
+ * responded (D-006, the "everyone answered" branch). The 48h branch is handled
+ * separately by the timeout sweep. Only acts while the agreement is still
+ * `under_review`; presenting the result to the contributor is wired separately.
+ */
+async function maybeCompleteReview(ctx: BotContext, agreementId: string): Promise<void> {
+  const agreement = await ctx.sheets.getAgreement(agreementId);
+  if (!agreement || agreement.status !== "under_review") return;
+
+  const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
+  if (!contributor) {
+    console.error(`maybeCompleteReview: contributor ${agreement.contributorId} not found`);
+    return;
+  }
+
+  const recipients = await getReviewRecipients(ctx, contributor.telegramId);
+  const feedbacks = await ctx.sheets.getReviewFeedbacks(agreementId);
+  if (!isReviewComplete(recipients, feedbacks)) return;
+
+  await aggregateForAgreement(agreementId, ctx.sheets, ctx.claude);
 }
