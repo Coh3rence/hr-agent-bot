@@ -136,8 +136,8 @@ bot.catch((err) => {
 // Review timeout sweep (D-007): catch up on boot, then run on a fixed interval.
 // Errors are swallowed inside the sweep so a bad pass never crashes the bot.
 function startReviewTimeoutSweep() {
-  void sweepExpiredReviews(sheets, claude);
-  setInterval(() => void sweepExpiredReviews(sheets, claude), SWEEP_INTERVAL_MS);
+  void sweepExpiredReviews(sheets, claude, bot.api);
+  setInterval(() => void sweepExpiredReviews(sheets, claude, bot.api), SWEEP_INTERVAL_MS);
 }
 
 // Start

@@ -37,7 +37,7 @@ export interface Agreement {
   commitmentPercent: number;
   durationMonths: number;
   settlementLikelihood: number;
-  status: "draft" | "submitted" | "under_review" | "approved" | "rejected" | "signed";
+  status: "draft" | "submitted" | "under_review" | "escalated" | "approved" | "rejected" | "signed";
   reviewerFeedback: ReviewerFeedback[];
   aggregatedCounterOffer: CounterOffer | null;
   negotiationRound: number;

@@ -293,6 +293,21 @@ export class SheetsService {
       }));
   }
 
+  /**
+   * True when an agreement has already been aggregated (column N non-empty).
+   * Used by the on-tap path to ignore a late responder arriving after quorum
+   * already closed and wrote the counter-offer (D-011 late-responder guard).
+   */
+  async isReviewAggregated(id: string): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:N",
+    });
+
+    const row = (res.data.values || []).find((r) => r[0] === id);
+    return !!(row && row[13] && String(row[13]).trim());
+  }
+
   async addAgreement(agreement: Agreement): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,

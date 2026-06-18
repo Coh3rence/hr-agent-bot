@@ -1,12 +1,14 @@
 import type { ReviewerFeedback } from "../models/types";
 
 /**
- * Quorum logic for the review flow (D-006).
+ * Quorum logic for the review flow (D-011, supersedes D-006/D-007).
  *
- * A review is "complete" — i.e. ready to aggregate — when every notified
- * reviewer has submitted at least one decision. The 48h timeout (D-007) is the
- * other way a review completes; it is handled by the caller, which treats the
- * `outstandingReviewers` as implicit approvals once the deadline passes.
+ * The client's model is a majority quorum, not unanimity: a review closes as
+ * soon as a *majority* of the notified reviewers have responded ("2 of 3").
+ * Reviewers who never respond are simply not counted — their silence is neither
+ * an approval nor a rejection, it just doesn't weigh in. If the 48h deadline
+ * passes and quorum was still never reached, the review escalates (handled by
+ * the timeout sweep) rather than auto-approving.
  *
  * These helpers are intentionally pure (no sheet/Claude access) so they are
  * trivially testable and reusable by both the on-tap check and the timeout sweep.
@@ -26,18 +28,45 @@ export function outstandingReviewers(
   return recipientIds.filter((id) => !responded.has(id));
 }
 
+/** Count of notified reviewers who have responded (responders outside the pool don't count). */
+export function respondedWithinPool(
+  recipientIds: string[],
+  feedbacks: ReviewerFeedback[]
+): number {
+  const responded = respondedReviewerIds(feedbacks);
+  return recipientIds.filter((id) => responded.has(id)).length;
+}
+
 /**
- * True when every notified reviewer has responded.
+ * Majority quorum threshold for a pool of `poolSize` reviewers: `floor(n/2)+1`.
+ * n=3 → 2 ("2 of 3"); n=2 → 2; n=1 → 1.
+ */
+export function quorumThreshold(poolSize: number): number {
+  return Math.floor(poolSize / 2) + 1;
+}
+
+/**
+ * True when a majority of notified reviewers have responded (D-011).
  *
- * Empty recipient list returns false: with no reviewers there is nothing to be
- * "complete" — the caller handles the no-reviewer case explicitly (it must not
- * silently auto-approve). Extra responders not in `recipientIds` (e.g. the pool
- * changed mid-window) are ignored; only `recipients ⊆ responders` is required.
+ * Empty recipient list returns false: with no reviewers there is no quorum to
+ * reach — the caller handles the no-reviewer case explicitly (it must not
+ * silently auto-approve). Responders not in `recipientIds` (e.g. the pool
+ * changed mid-window) are ignored; only responders *within* the pool count
+ * toward quorum.
  */
 export function isReviewComplete(
   recipientIds: string[],
   feedbacks: ReviewerFeedback[]
 ): boolean {
   if (recipientIds.length === 0) return false;
-  return outstandingReviewers(recipientIds, feedbacks).length === 0;
+  return respondedWithinPool(recipientIds, feedbacks) >= quorumThreshold(recipientIds.length);
+}
+
+/**
+ * The review pool for a proposal: every admin except the contributor (a
+ * contributor never reviews their own proposal). Pure so both the on-tap path
+ * and the timeout sweep derive the same pool.
+ */
+export function reviewRecipients(adminIds: string[], contributorTelegramId: string): string[] {
+  return adminIds.filter((id) => id !== contributorTelegramId);
 }

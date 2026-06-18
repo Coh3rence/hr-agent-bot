@@ -1,34 +1,43 @@
 import type { SheetsService } from "./sheets";
 import type { ClaudeService } from "./claude";
 import { aggregateForAgreement } from "./aggregation";
+import { reviewRecipients, respondedWithinPool, quorumThreshold } from "./quorum";
 
 /**
- * Review timeout sweep (D-007, the "48h cutoff" branch of D-006).
+ * Review timeout sweep (D-011, the "48h cutoff" branch of the quorum model).
  *
- * A review completes one of two ways: every notified reviewer responds (handled
- * on-tap in review.ts), or the 48h window elapses. This sweep handles the second
- * case. It re-reads the Agreements tab — the sheet is the source of truth, so the
- * deadline survives restarts and the sweep is safe to run on startup to catch up
- * on anything that expired while the process was down.
+ * A review completes one of two ways: a majority of notified reviewers respond
+ * (handled on-tap in review.ts), or the 48h window elapses. This sweep handles
+ * the second case. It re-reads the Agreements tab — the sheet is the source of
+ * truth, so the deadline survives restarts and the sweep is safe to run on
+ * startup to catch up on anything that expired while the process was down.
  *
- * Silence = approval (D-006): reviewers who never answered are treated as having
- * approved. Aggregating only the feedback that *did* arrive already encodes this —
- * an implicit approval carries no rate and no objection, so it never changes the
- * outcome. The one case the normal engine can't express is *every* reviewer
- * silent (no feedback at all): that is a full default-approval, written directly.
+ * Quorum, not silence=approval (D-011, supersedes D-006/D-007): non-responders
+ * are simply not counted. When the deadline passes we check whether quorum was
+ * reached among the responders. If it was, we aggregate the feedback that
+ * arrived. If it was NOT — including the all-silent case — the review escalates:
+ * every admin is DM'd and the agreement is moved to `escalated`. We never
+ * auto-approve a proposal no one actually approved.
  *
  * Idempotent: an agreement is processed only while still `under_review` AND not
  * yet aggregated (column N empty). The first writer — this sweep or the on-tap
- * trigger — populates M/N; everyone else skips. Late firing therefore produces
- * the same result, so downtime costs bounded latency, never a lost/wrong decision.
+ * trigger — populates M/N or moves the status off `under_review`; everyone else
+ * skips. Late firing therefore produces the same result, so downtime costs
+ * bounded latency, never a lost/wrong decision.
  */
 
 export const REVIEW_WINDOW_MS = 48 * 60 * 60 * 1000;
 export const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 
+/** Minimal surface of the bot api the sweep needs to DM admins on escalation. */
+export interface Notifier {
+  sendMessage(chatId: number | string, text: string): Promise<unknown>;
+}
+
 export async function sweepExpiredReviews(
   sheets: SheetsService,
   claude: ClaudeService,
+  notifier: Notifier,
   now: number = Date.now()
 ): Promise<void> {
   let states;
@@ -52,7 +61,7 @@ export async function sweepExpiredReviews(
     if (now - submittedMs < REVIEW_WINDOW_MS) continue;
 
     try {
-      await completeExpiredReview(s.id, sheets, claude);
+      await completeExpiredReview(s.id, sheets, claude, notifier);
     } catch (err) {
       console.error(`sweepExpiredReviews: failed to complete ${s.id}:`, err);
     }
@@ -62,26 +71,61 @@ export async function sweepExpiredReviews(
 async function completeExpiredReview(
   agreementId: string,
   sheets: SheetsService,
-  claude: ClaudeService
+  claude: ClaudeService,
+  notifier: Notifier
 ): Promise<void> {
-  const feedbacks = await sheets.getReviewFeedbacks(agreementId);
+  const agreement = await sheets.getAgreement(agreementId);
+  if (!agreement || agreement.status !== "under_review") return;
 
-  if (feedbacks.length === 0) {
-    // Every reviewer stayed silent → approve by default (D-006 silence=approval).
-    // The aggregation engine returns null on empty input, so write it directly.
-    const agreement = await sheets.getAgreement(agreementId);
-    if (!agreement || agreement.status !== "under_review") return;
-    await sheets.updateAgreementAggregation(
-      agreementId,
-      agreement.hourlyRate,
-      "No reviewer responded within 48 hours; approved by default."
-    );
-    console.log(`sweepExpiredReviews: ${agreementId} approved by default (no responses)`);
+  const contributor = await sheets.getContributorById(agreement.contributorId);
+  if (!contributor) {
+    console.error(`sweepExpiredReviews: ${agreementId} has no contributor; skipping`);
     return;
   }
 
-  const result = await aggregateForAgreement(agreementId, sheets, claude);
+  const adminIds = await sheets.getAdminIds();
+  const recipients = reviewRecipients(adminIds, contributor.telegramId);
+  const feedbacks = await sheets.getReviewFeedbacks(agreementId);
+  const responded = respondedWithinPool(recipients, feedbacks);
+
+  const quorumReached =
+    recipients.length > 0 && responded >= quorumThreshold(recipients.length);
+
+  if (quorumReached) {
+    const result = await aggregateForAgreement(agreementId, sheets, claude);
+    console.log(
+      `sweepExpiredReviews: ${agreementId} aggregated on timeout (outcome=${result?.outcome ?? "none"})`
+    );
+    return;
+  }
+
+  await escalateReview(agreementId, recipients.length, responded, sheets, notifier);
+}
+
+async function escalateReview(
+  agreementId: string,
+  poolSize: number,
+  responded: number,
+  sheets: SheetsService,
+  notifier: Notifier
+): Promise<void> {
+  const adminIds = await sheets.getAdminIds();
+  const message =
+    `Review escalation: agreement ${agreementId} reached its 48h deadline without quorum ` +
+    `(${responded}/${poolSize} reviewers responded, ${quorumThreshold(poolSize)} needed). ` +
+    `It needs a manual decision — no counter-offer was generated.`;
+
+  // DM admins first so the escalation is delivered even if the status write fails.
+  for (const adminId of adminIds) {
+    try {
+      await notifier.sendMessage(Number(adminId), message);
+    } catch (err) {
+      console.error(`sweepExpiredReviews: could not DM admin ${adminId} for ${agreementId}:`, err);
+    }
+  }
+
+  await sheets.updateAgreementStatus(agreementId, "escalated");
   console.log(
-    `sweepExpiredReviews: ${agreementId} aggregated on timeout (outcome=${result?.outcome ?? "none"})`
+    `sweepExpiredReviews: ${agreementId} escalated (no quorum: ${responded}/${poolSize})`
   );
 }
