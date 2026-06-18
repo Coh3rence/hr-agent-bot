@@ -38,3 +38,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *-credentials.json
 *service-account*.json
 scripts/setup-env.sh
+
+# Local working log (iterations + rollback anchors)
+ITERATIONS.md
+DECISIONS.md
+BACKLOG.md

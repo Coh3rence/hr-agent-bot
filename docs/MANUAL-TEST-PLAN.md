@@ -79,7 +79,7 @@ between runs.
 
 ---
 
-## Part C — Live review flow over Telegram (*iter-3b + iter-3d*, shipped)
+## Part C — Live review flow over Telegram (*iter-3b + iter-3d + iter-3g*, shipped)
 
 These exercise the wired bot. For each, a contributor first reaches a finalized
 proposal so it can be submitted for review (run the discovery → matching →
@@ -87,7 +87,14 @@ negotiation flow, or seed an Agreement row in `pending`/ready state). When the
 contributor taps **Submit for review**, every admin except the contributor gets a
 DM with Approve / Counter / Reject buttons.
 
-### C1. Two reviewers, all approve → aggregation fires on the LAST response — *iter-3d + D-006*
+> **Quorum model (D-011):** a review closes as soon as a **majority** of the
+> notified reviewers respond — quorum = `floor(pool/2)+1` (so **2 of 3**; with a
+> pool of 2, both). Non-responders are **not counted**. If the 48h deadline
+> passes without quorum, the review **escalates** (admins are DM'd, status →
+> `escalated`) — it is *not* auto-approved. With exactly two reviewers, quorum is
+> both, so the two-reviewer cases below still fire on the last response.
+
+### C1. Two reviewers, all approve → aggregation fires on the LAST response — *iter-3d + D-011*
 - **Setup:** two admin reviewers (R1, R2) for one proposal.
 - **Steps:** R1 taps **Approve** → then R2 taps **Approve**.
 - **Expected:**
@@ -141,63 +148,90 @@ DM with Approve / Counter / Reject buttons.
   tap, confirm it now records.
 - [ ] Pass
 
-### C6. Contributor excluded from their own review pool — *getReviewRecipients*
+### C6. Contributor excluded from their own review pool — *reviewRecipients*
 - **Setup:** make the contributor also an admin in AuthorizedUsers.
 - **Steps:** contributor submits a proposal for review.
 - **Expected:** the contributor does **not** receive a reviewer DM for their own
   proposal; quorum is measured against the *other* admins only.
 - [ ] Pass
 
+### C7. Three reviewers, majority closes early (2 of 3) — *iter-3g + D-011*
+- **Setup:** three admin reviewers (R1, R2, R3) for one proposal (pool of 3,
+  quorum = 2).
+- **Steps:** R1 **Approve** → R2 **Approve** (R3 never taps).
+- **Expected:**
+  - After R1: "Approval recorded." No aggregation (1 of 3, quorum not yet met).
+  - After R2 (quorum reached at 2 of 3): aggregation runs **immediately** — the
+    bot does **not** wait for R3. M/N written; R3's silence is simply not counted.
+- **Then (late responder):** R3 taps **Reject** *after* aggregation.
+- **Expected:** `maybeCompleteReview` sees the review already aggregated and does
+  nothing — no re-open, no second aggregation, no overwrite of M/N.
+- [ ] Pass
+
 ---
 
-## Part D — Timeout sweep (*iter-3e*, shipped) + not-yet-shipped (3f)
+## Part D — Timeout sweep (*iter-3e + iter-3g*, shipped) + not-yet-shipped (3f)
 
 > Easiest way to trigger the sweep without waiting 48h: in the test sheet, edit
 > the target Agreement's **submittedAt** (column L) to a timestamp >48h in the
 > past, leave its **status** (column J) = `under_review`, and make sure the
 > aggregation cells (columns M/N) are **empty**. Then restart the bot (startup
 > sweep fires immediately) or wait for the next 15-min tick.
+>
+> **D-011 change:** the sweep no longer treats silence as approval. At the
+> deadline it checks whether **quorum** was reached among the reviewers who
+> *did* respond. Quorum reached → aggregate. Quorum **not** reached (including
+> all-silent) → **escalate**: every admin is DM'd and the agreement moves to
+> `escalated`. To confirm an escalation: watch for the admin DM and check the
+> Agreement's **status** (column J) flips to `escalated` while M/N stay empty.
 
-### D1. 48h timeout with partial responses → silence = approval — *iter-3e*
-- **Setup:** two reviewers; R1 has Countered, R2 stays silent. Backdate
-  `submittedAt` >48h; M/N empty.
+### D1. Deadline with quorum reached → aggregate on timeout — *iter-3g + D-011*
+- **Setup:** three reviewers (pool of 3, quorum = 2); R1 **Approve**, R2
+  **Counter**, R3 silent. Backdate `submittedAt` >48h; M/N empty; status
+  `under_review`.
 - **Steps:** restart the bot (or wait for a tick).
-- **Expected:** the sweep aggregates using the responders' decisions; the silent
-  reviewer is an implicit approval (carries no rate/objection, doesn't change the
-  bucket). M/N get written. Console logs `aggregated on timeout`.
+- **Expected:** 2 of 3 responded = quorum met, so the sweep aggregates the two
+  decisions that arrived (R3's silence not counted). M/N get written. Console
+  logs `aggregated on timeout`. No escalation DM.
 - [ ] Pass
 
-### D2. 48h timeout, every reviewer silent → default approval — *iter-3e*
-- **Setup:** an `under_review` agreement with **no** ReviewFeedback rows;
-  `submittedAt` backdated >48h; M/N empty.
+### D2. Deadline without quorum → escalate (no default approval) — *iter-3g + D-011*
+- **Setup:** three reviewers; only R1 responded (1 of 3, quorum not met). Or:
+  an `under_review` agreement with **no** ReviewFeedback rows (all silent).
+  Backdate `submittedAt` >48h; M/N empty.
 - **Steps:** restart the bot (or wait for a tick).
-- **Expected:** M = the original rate, N = "No reviewer responded within 48 hours;
-  approved by default." Console logs `approved by default (no responses)`. Claude
-  is **not** called.
+- **Expected:** the sweep **escalates** — every admin receives a DM naming the
+  agreement id and the responded/needed counts; the Agreement's status flips to
+  `escalated`; M/N stay **empty**. Claude is **not** called. Console logs
+  `escalated (no quorum: X/Y)`. No auto-approval.
 - [ ] Pass
 
-### D3. Idempotency — sweep does not double-fire / conflict with on-tap — *iter-3e*
-- **Steps:** after D1 or D2 has written M/N, leave the agreement `under_review`
-  and trigger the sweep again (restart / next tick). Separately: an agreement the
+### D3. Idempotency — sweep does not double-fire / conflict with on-tap — *iter-3e + iter-3g*
+- **Steps:** after D1 has written M/N, leave the agreement `under_review` and
+  trigger the sweep again (restart / next tick). Separately: an agreement the
   on-tap path already aggregated (Part C) — confirm the sweep leaves it alone.
-- **Expected:** the second sweep sees column N populated (`aggregated = true`) and
-  skips — no second write, no duplicate Claude call. Whoever wrote M/N first wins.
+  Separately: an agreement already `escalated` (D2) — confirm the sweep skips it
+  (status ≠ `under_review`), so admins are not re-DM'd.
+- **Expected:** the second sweep sees column N populated (`aggregated = true`) or
+  the status off `under_review` and skips — no second write, no duplicate Claude
+  call, no duplicate escalation DM. Whoever acted first wins.
 - [ ] Pass
 
 ### D4. Downtime across a deadline → bounded latency, correct outcome — *iter-3e startup sweep*
 - **Steps:** submit a proposal, stop the bot, backdate `submittedAt` >48h while
   it's down (simulating the deadline passing during downtime), restart the bot.
 - **Expected:** the startup sweep re-reads the Agreements tab, sees the expired
-  review, and completes it on boot. Downtime causes only bounded latency — never a
-  lost or wrong decision (deadline is stored on the sheet; silence = approval makes
-  a late firing produce the same outcome).
+  review, and resolves it on boot — aggregate if quorum was reached, otherwise
+  escalate. Downtime causes only bounded latency — never a lost or wrong decision
+  (deadline is stored on the sheet, so a late firing produces the same outcome a
+  timely one would have).
 - [ ] Pass
 
-### D5. Bad submittedAt is not auto-approved — *iter-3e guard*
+### D5. Bad submittedAt is not auto-resolved — *iter-3e guard*
 - **Setup:** an `under_review` agreement with an empty/garbled `submittedAt`.
 - **Steps:** trigger the sweep.
-- **Expected:** the sweep logs a warning and **skips** it — no default approval on
-  an undeterminable deadline.
+- **Expected:** the sweep logs a warning and **skips** it — no aggregation and no
+  escalation on an undeterminable deadline.
 - [ ] Pass
 
 ### D6. Aggregated counter-offer presented to the contributor — *iter-3f (planned)*
@@ -218,6 +252,9 @@ DM with Approve / Counter / Reject buttons.
 | single counter | `mixed` | that reviewer's rate | their feedback |
 | mixed / multi counter | `mixed` | mean of counter rates (rounded) | Claude one-paragraph synthesis |
 
-Completion (D-006): aggregate when **every notified reviewer has responded**, or
-(once iter-3e lands) when the 48h deadline passes. An empty reviewer pool never
-auto-approves — it's surfaced, not silently completed.
+Completion (D-011, supersedes D-006/D-007): aggregate as soon as a **majority of
+notified reviewers respond** (quorum = `floor(pool/2)+1`, "2 of 3" — early close).
+Non-responders are not counted. If the 48h deadline passes **with** quorum among
+responders, aggregate; **without** quorum (including all-silent), **escalate** —
+DM admins and set status `escalated`. A proposal no one approved is never
+auto-approved.
