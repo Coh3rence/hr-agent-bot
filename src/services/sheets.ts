@@ -378,6 +378,43 @@ export class SheetsService {
     return true;
   }
 
+  /**
+   * True when the contributor has already been DM'd the counter-offer
+   * (column O = candidateNotifiedAt non-empty). The exactly-once guard for
+   * `presentToCandidate` (D-008): both the on-tap and sweep triggers check this
+   * before sending, so the candidate is notified once even across restarts.
+   */
+  async isCandidateNotified(id: string): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:O",
+    });
+
+    const row = (res.data.values || []).find((r) => r[0] === id);
+    return !!(row && row[14] && String(row[14]).trim());
+  }
+
+  /** Stamp column O with the time the contributor was DM'd the counter-offer (D-008). */
+  async markCandidateNotified(id: string, at: string = new Date().toISOString()): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:A",
+    });
+
+    const rows = res.data.values || [];
+    const index = rows.findIndex((r) => r[0] === id);
+    if (index === -1) return false;
+
+    const rowNum = index + 2;
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `Agreements!O${rowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[at]] },
+    });
+    return true;
+  }
+
   // --- Review Feedback ---
 
   async addReviewFeedback(
