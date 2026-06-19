@@ -234,12 +234,29 @@ DM with Approve / Counter / Reject buttons.
   escalation on an undeterminable deadline.
 - [ ] Pass
 
-### D6. Aggregated counter-offer presented to the contributor — *iter-3f (planned)*
-- **Expected:** after aggregation, the contributor is DM'd the counter-offer with
-  Accept / Modify / Walk-away. Callback carries the agreement id; the session is
-  rebuilt from the sheet if the contributor has no active session. Accept →
-  finalized; Modify → re-enters negotiation; Walk-away → cooldown.
-- [ ] Pass (when iter-3f lands)
+### D6. Aggregated counter-offer presented to the contributor
+- **Setup:** drive a proposal through to aggregation (D1 quorum path or a timeout
+  with quorum). Confirm column N (summary) and M (rate) are populated.
+- **Expected:** the contributor is DM'd the counter-offer with Accept / Modify /
+  Walk-away. The buttons carry the agreement id (`resolution:<action>:<id>`), so
+  the flow works even after a restart or a long delay (cold session): tapping a
+  button rehydrates the session from the sheet.
+  - **Accept** → status `approved`, congratulations message, session reset.
+  - **Modify** → re-enters negotiation seeded with the prior terms; the next
+    message proposes new terms and creates a fresh draft.
+  - **Walk-away** → status `rejected`, contributor put on a 3-day cooldown,
+    `previousAttempts` incremented.
+- **Notify-once:** the DM fires exactly once even if both the on-tap close and the
+  sweep run (column O guard). Re-running the sweep does not re-DM.
+- [ ] Pass
+
+### D7. Cold-session resolution (restart safety)
+- **Setup:** after D6's DM is delivered, restart the bot process (clears in-memory
+  sessions) **before** the contributor taps a button. Then tap Accept.
+- **Expected:** resolution still succeeds — the agreement id from the callback is
+  used to reload the agreement and rebuild the session; no "no active session"
+  dead-end.
+- [ ] Pass
 
 ---
 
