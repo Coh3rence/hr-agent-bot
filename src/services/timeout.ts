@@ -2,6 +2,7 @@ import type { SheetsService } from "./sheets";
 import type { ClaudeService } from "./claude";
 import { aggregateForAgreement } from "./aggregation";
 import { reviewRecipients, respondedWithinPool, quorumThreshold } from "./quorum";
+import { presentToCandidate, type Notifier } from "./presentation";
 
 /**
  * Review timeout sweep (D-011, the "48h cutoff" branch of the quorum model).
@@ -29,11 +30,6 @@ import { reviewRecipients, respondedWithinPool, quorumThreshold } from "./quorum
 export const REVIEW_WINDOW_MS = 48 * 60 * 60 * 1000;
 export const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 
-/** Minimal surface of the bot api the sweep needs to DM admins on escalation. */
-export interface Notifier {
-  sendMessage(chatId: number | string, text: string): Promise<unknown>;
-}
-
 export async function sweepExpiredReviews(
   sheets: SheetsService,
   claude: ClaudeService,
@@ -49,7 +45,20 @@ export async function sweepExpiredReviews(
   }
 
   for (const s of states) {
-    if (s.status !== "under_review" || s.aggregated) continue;
+    if (s.status !== "under_review") continue;
+
+    // Already aggregated but still under_review → restart-safe notify catch-up:
+    // if the bot died between aggregating and DMing the candidate, deliver it now.
+    if (s.aggregated) {
+      if (!s.notified) {
+        try {
+          await presentToCandidate(s.id, sheets, notifier);
+        } catch (err) {
+          console.error(`sweepExpiredReviews: failed to notify candidate for ${s.id}:`, err);
+        }
+      }
+      continue;
+    }
 
     const submittedMs = Date.parse(s.submittedAt);
     if (Number.isNaN(submittedMs)) {
@@ -96,6 +105,7 @@ async function completeExpiredReview(
     console.log(
       `sweepExpiredReviews: ${agreementId} aggregated on timeout (outcome=${result?.outcome ?? "none"})`
     );
+    if (result) await presentToCandidate(agreementId, sheets, notifier);
     return;
   }
 

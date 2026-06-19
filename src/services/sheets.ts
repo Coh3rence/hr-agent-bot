@@ -276,11 +276,17 @@ export class SheetsService {
    * (by either the on-tap quorum trigger or a prior sweep), the review is done.
    */
   async listAgreementReviewState(): Promise<
-    { id: string; status: Agreement["status"]; submittedAt: string; aggregated: boolean }[]
+    {
+      id: string;
+      status: Agreement["status"];
+      submittedAt: string;
+      aggregated: boolean;
+      notified: boolean;
+    }[]
   > {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Agreements!A2:N",
+      range: "Agreements!A2:O",
     });
 
     return (res.data.values || [])
@@ -290,7 +296,34 @@ export class SheetsService {
         status: row[9] as Agreement["status"],
         submittedAt: row[11] || "",
         aggregated: !!(row[13] && String(row[13]).trim()),
+        notified: !!(row[14] && String(row[14]).trim()),
       }));
+  }
+
+  /**
+   * The aggregated counter-offer to show the contributor, read from columns
+   * M (rate) and N (summary). Returns null when nothing has been aggregated
+   * (N empty), so `presentToCandidate` can read it back self-containedly after a
+   * restart rather than depending on the in-memory aggregation result.
+   */
+  async getCandidateOffer(
+    id: string
+  ): Promise<{ suggestedRate: number | null; qualitativeSummary: string } | null> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:N",
+    });
+
+    const row = (res.data.values || []).find((r) => r[0] === id);
+    if (!row) return null;
+
+    const qualitativeSummary = row[13] ? String(row[13]).trim() : "";
+    if (!qualitativeSummary) return null;
+
+    const rateRaw = row[12];
+    const rate = rateRaw === "" || rateRaw == null ? null : Number(rateRaw);
+    const suggestedRate = rate == null || Number.isNaN(rate) ? null : rate;
+    return { suggestedRate, qualitativeSummary };
   }
 
   /**

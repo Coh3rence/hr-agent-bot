@@ -2,6 +2,7 @@ import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
 import type { ReviewerFeedback } from "../models/types";
 import { isReviewComplete, reviewRecipients } from "../services/quorum";
+import { presentToCandidate } from "../services/presentation";
 import { aggregateForAgreement } from "../services/aggregation";
 
 export async function handleReview(ctx: BotContext): Promise<void> {
@@ -243,5 +244,6 @@ async function maybeCompleteReview(ctx: BotContext, agreementId: string): Promis
   const feedbacks = await ctx.sheets.getReviewFeedbacks(agreementId);
   if (!isReviewComplete(recipients, feedbacks)) return;
 
-  await aggregateForAgreement(agreementId, ctx.sheets, ctx.claude);
+  const result = await aggregateForAgreement(agreementId, ctx.sheets, ctx.claude);
+  if (result) await presentToCandidate(agreementId, ctx.sheets, ctx.api);
 }
