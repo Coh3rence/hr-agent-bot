@@ -1,4 +1,5 @@
 import type { BotContext } from "../bot";
+import { buildModifyContext } from "../services/modify-context";
 
 /**
  * Candidate-facing resolution of a reviewed proposal (D-010).
@@ -47,21 +48,16 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     ctx.session.currentAgreementId = null;
     ctx.session.selectedOpportunityId = null;
     ctx.session.messageHistory = [];
+    ctx.session.negotiationContext = null;
   } else if (action === "modify") {
     // Re-enter negotiation. Clear currentAgreementId so a fresh draft is created
-    // when the new terms complete; seed history with the prior offer so the
-    // candidate has continuity (terms, not the verbatim earlier conversation).
+    // when the new terms complete. The prior offer + counter + reviewer reasons
+    // ride in negotiationContext (D-012) as system-prompt background, keeping
+    // messageHistory a clean user-first transcript.
     ctx.session.currentAgreementId = null;
     ctx.session.phase = "negotiation";
-    ctx.session.messageHistory = [
-      {
-        role: "assistant",
-        content:
-          `Previous proposal: $${agreement.hourlyRate}/hr, ` +
-          `${agreement.commitmentPercent}% commitment, ` +
-          `${agreement.durationMonths} months.`,
-      },
-    ];
+    ctx.session.messageHistory = [];
+    ctx.session.negotiationContext = await buildModifyContext(agreementId, ctx.sheets);
 
     await ctx.reply(
       "No problem — let's revise your terms. What would you like to change? " +
@@ -90,5 +86,6 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     ctx.session.currentAgreementId = null;
     ctx.session.selectedOpportunityId = null;
     ctx.session.messageHistory = [];
+    ctx.session.negotiationContext = null;
   }
 }
