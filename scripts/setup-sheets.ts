@@ -118,11 +118,12 @@ async function main() {
           ]],
         },
         {
-          range: "Agreements!A1:L1",
+          range: "Agreements!A1:O1",
           values: [[
             "id", "opportunityId", "contributorId", "roleName",
             "responsibilities", "hourlyRate", "commitmentPercent", "durationMonths",
             "settlementLikelihood", "status", "negotiationRound", "submittedAt",
+            "aggregatedRate", "aggregatedSummary", "candidateNotifiedAt",
           ]],
         },
         {
