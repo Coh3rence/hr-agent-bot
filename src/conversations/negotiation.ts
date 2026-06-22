@@ -58,8 +58,14 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
     .map((m) => `${m.role}: ${m.content}`)
     .join("\n");
 
+  // On a Modify re-entry the transcript is empty; the reconstructed brief (D-012)
+  // rides in the system prompt as background, not as a fake conversation turn.
+  const systemPrompt = ctx.session.negotiationContext
+    ? `${NEGOTIATION_SYSTEM_PROMPT}\n\n${ctx.session.negotiationContext}`
+    : NEGOTIATION_SYSTEM_PROMPT;
+
   const extracted = await ctx.claude.extractStructured<ExtractedTerms>(
-    NEGOTIATION_SYSTEM_PROMPT,
+    systemPrompt,
     conversationText,
     "extract_terms",
     TERMS_TOOL_SCHEMA
@@ -111,6 +117,7 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
 
     await ctx.sheets.addAgreement(agreement);
     ctx.session.currentAgreementId = agreement.id;
+    ctx.session.negotiationContext = null;
 
     const likelihoodLabel =
       likelihood >= 75 ? "High" : likelihood >= 50 ? "Medium" : "Low";
@@ -131,7 +138,7 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       { parse_mode: "Markdown", reply_markup: keyboard }
     );
   } else {
-    const response = await ctx.claude.chat(NEGOTIATION_SYSTEM_PROMPT, ctx.session.messageHistory);
+    const response = await ctx.claude.chat(systemPrompt, ctx.session.messageHistory);
     ctx.session.messageHistory.push({ role: "assistant", content: response });
     await ctx.reply(response);
   }

@@ -49,6 +49,7 @@ bot.use(
       messageHistory: [],
       pendingReviewAgreementId: null,
       pendingReviewDecision: null,
+      negotiationContext: null,
     }),
   })
 );

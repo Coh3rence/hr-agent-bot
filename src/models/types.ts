@@ -91,4 +91,5 @@ export interface SessionData {
   messageHistory: { role: "user" | "assistant"; content: string }[];
   pendingReviewAgreementId: string | null;
   pendingReviewDecision: "counter" | "reject" | null;
+  negotiationContext: string | null;
 }
