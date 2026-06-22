@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "bun run --watch index.ts",
+    "dev:stage": "NODE_ENV=development bun run --watch index.ts",
     "start": "bun run index.ts",
+    "start:stage": "NODE_ENV=development bun run index.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
