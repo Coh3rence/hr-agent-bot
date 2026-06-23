@@ -2,6 +2,7 @@ import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
 import type { ReviewerFeedback } from "../models/types";
 import { isReviewComplete, reviewRecipients } from "../services/quorum";
+import { selfReviewAllowed } from "../config";
 import { presentToCandidate } from "../services/presentation";
 import { aggregateForAgreement } from "../services/aggregation";
 
@@ -182,7 +183,7 @@ async function notifyReviewers(ctx: BotContext, agreementId: string): Promise<vo
   }
 
   const adminIds = await ctx.sheets.getAdminIds();
-  const recipients = reviewRecipients(adminIds, contributor.telegramId);
+  const recipients = reviewRecipients(adminIds, contributor.telegramId, selfReviewAllowed());
 
   if (recipients.length === 0) {
     console.warn(`notifyReviewers: no reviewers available for agreement ${agreementId}`);
@@ -240,7 +241,7 @@ async function maybeCompleteReview(ctx: BotContext, agreementId: string): Promis
   }
 
   const adminIds = await ctx.sheets.getAdminIds();
-  const recipients = reviewRecipients(adminIds, contributor.telegramId);
+  const recipients = reviewRecipients(adminIds, contributor.telegramId, selfReviewAllowed());
   const feedbacks = await ctx.sheets.getReviewFeedbacks(agreementId);
   if (!isReviewComplete(recipients, feedbacks)) return;
 

@@ -66,7 +66,17 @@ export function isReviewComplete(
  * The review pool for a proposal: every admin except the contributor (a
  * contributor never reviews their own proposal). Pure so both the on-tap path
  * and the timeout sweep derive the same pool.
+ *
+ * `allowSelfReview` is a dev-only escape hatch (see `selfReviewAllowed`) that
+ * keeps the contributor in the pool so the whole loop can be exercised from a
+ * single Telegram account. It defaults to false, so production behavior — a
+ * contributor can never review their own proposal — is unchanged.
  */
-export function reviewRecipients(adminIds: string[], contributorTelegramId: string): string[] {
+export function reviewRecipients(
+  adminIds: string[],
+  contributorTelegramId: string,
+  allowSelfReview = false
+): string[] {
+  if (allowSelfReview) return [...adminIds];
   return adminIds.filter((id) => id !== contributorTelegramId);
 }

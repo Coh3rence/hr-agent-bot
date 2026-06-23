@@ -15,6 +15,16 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * Dev-only escape hatch: lets a contributor review their own proposal so the
+ * full review loop can be exercised from a single Telegram account. Requires
+ * BOTH NODE_ENV=development AND ALLOW_SELF_REVIEW=true, so it can never activate
+ * in production even if the flag is set by accident.
+ */
+export function selfReviewAllowed(): boolean {
+  return process.env.NODE_ENV === "development" && process.env.ALLOW_SELF_REVIEW === "true";
+}
+
 export function loadConfig(): Env {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {

@@ -3,6 +3,7 @@ import type { ClaudeService } from "./claude";
 import { aggregateForAgreement } from "./aggregation";
 import { reviewRecipients, respondedWithinPool, quorumThreshold } from "./quorum";
 import { presentToCandidate, type Notifier } from "./presentation";
+import { selfReviewAllowed } from "../config";
 
 /**
  * Review timeout sweep (D-011, the "48h cutoff" branch of the quorum model).
@@ -93,7 +94,7 @@ async function completeExpiredReview(
   }
 
   const adminIds = await sheets.getAdminIds();
-  const recipients = reviewRecipients(adminIds, contributor.telegramId);
+  const recipients = reviewRecipients(adminIds, contributor.telegramId, selfReviewAllowed());
   const feedbacks = await sheets.getReviewFeedbacks(agreementId);
   const responded = respondedWithinPool(recipients, feedbacks);
 
