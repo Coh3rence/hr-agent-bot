@@ -109,21 +109,21 @@ async function main() {
           ]],
         },
         {
-          range: "Contributors!A1:N1",
+          range: "Contributors!A1:P1",
           values: [[
             "id", "telegramId", "telegramHandle", "name",
             "skills", "commitmentPercent", "desiredRateMin", "desiredRateMax",
             "timezone", "location", "status", "cooldownUntil",
-            "previousAttempts", "createdAt",
+            "previousAttempts", "createdAt", "walletAddress", "collabberryUserId",
           ]],
         },
         {
-          range: "Agreements!A1:O1",
+          range: "Agreements!A1:P1",
           values: [[
             "id", "opportunityId", "contributorId", "roleName",
             "responsibilities", "hourlyRate", "commitmentPercent", "durationMonths",
             "settlementLikelihood", "status", "negotiationRound", "submittedAt",
-            "aggregatedRate", "aggregatedSummary", "candidateNotifiedAt",
+            "aggregatedRate", "aggregatedSummary", "candidateNotifiedAt", "betaAppAgreementId",
           ]],
         },
         {
