@@ -1,4 +1,5 @@
 import type { BotContext } from "../bot";
+import type { Agreement, Contributor } from "../models/types";
 import { buildModifyContext } from "../services/modify-context";
 
 /**
@@ -37,18 +38,93 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
   if (action === "accept") {
     await ctx.sheets.updateAgreementStatus(agreementId, "approved");
 
-    await ctx.reply(
-      "Congratulations! Your agreement has been approved. The admin will now create your agreement in the Collabberry Beta App, and you'll receive a notification to finalize it.\n\nWelcome to the team!"
-    );
+    const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
+    if (!contributor) {
+      console.error(`handleResolution: contributor ${agreement.contributorId} not found`);
+      await ctx.reply(
+        "Your agreement has been approved! We hit a snag finalizing it — the admin has been notified and will follow up."
+      );
+      resetSession(ctx);
+      return;
+    }
 
-    // TODO: Call Beta App API to create agreement
-    // POST /orgs/agreement { userId, roleName, responsibilities, marketRate, fiatRequested, commitment }
+    // Already linked to a Collabberry user → create the agreement straight away.
+    if (contributor.collabberryUserId) {
+      await createBetaAgreement(ctx, agreement, contributor);
+      resetSession(ctx);
+      return;
+    }
 
-    ctx.session.phase = "idle";
-    ctx.session.currentAgreementId = null;
-    ctx.session.selectedOpportunityId = null;
-    ctx.session.messageHistory = [];
-    ctx.session.negotiationContext = null;
+    // Not linked yet → issue a unique invite link and wait for self-registration (D-014).
+    // Wallet ownership is proven by the contributor's Collabberry sign-up signature;
+    // we never ask them to type a wallet in chat.
+    try {
+      const invite = await ctx.beta.createInviteLink();
+      await ctx.reply(
+        "Congratulations — your agreement is approved! One quick step to finalize.\n\n" +
+          `1. Open your Collabberry invite: ${invite.url}\n` +
+          "2. Sign up by connecting and signing with your wallet — this proves ownership and is where your TeamPoints are paid.\n" +
+          `3. Use your Telegram handle ${handleForDisplay(contributor.telegramHandle)} exactly when asked.\n\n` +
+          "When you're done, tap the button below and I'll create your agreement automatically.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "I've signed up", callback_data: `resolution:linked:${agreementId}` }],
+            ],
+          },
+        }
+      );
+      ctx.session.phase = "awaiting_collabberry_signup";
+      ctx.session.currentAgreementId = agreementId;
+    } catch (err) {
+      console.error("handleResolution accept: invite link failed", err);
+      await ctx.reply(
+        "Your agreement is approved! We couldn't generate your Collabberry invite just now — the admin has been notified and will follow up."
+      );
+      resetSession(ctx);
+    }
+  } else if (action === "linked") {
+    // Contributor reports they've finished Collabberry sign-up. Resolve them on
+    // the org roster by Telegram handle, capture the verified wallet + userId,
+    // then create the agreement (D-014).
+    const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
+    if (!contributor) return;
+
+    try {
+      const match = await ctx.beta.resolveByHandle(contributor.telegramHandle);
+      if (!match || !match.walletAddress) {
+        await ctx.reply(
+          "I couldn't find your Collabberry sign-up yet. Make sure you finished signing up and " +
+            `used your Telegram handle ${handleForDisplay(contributor.telegramHandle)} exactly, ` +
+            'then tap "I\'ve signed up" again.',
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "I've signed up", callback_data: `resolution:linked:${agreementId}` }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      await ctx.sheets.updateContributor(contributor.id, {
+        walletAddress: match.walletAddress,
+        collabberryUserId: match.id,
+      });
+
+      await createBetaAgreement(ctx, agreement, {
+        ...contributor,
+        walletAddress: match.walletAddress,
+        collabberryUserId: match.id,
+      });
+      resetSession(ctx);
+    } catch (err) {
+      console.error("handleResolution linked: resolve/create failed", err);
+      await ctx.reply(
+        "Something went wrong linking your Collabberry account. The admin has been notified and will follow up."
+      );
+    }
   } else if (action === "modify") {
     // Re-enter negotiation. Clear currentAgreementId so a fresh draft is created
     // when the new terms complete. The prior offer + counter + reviewer reasons
@@ -82,10 +158,81 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
       "Thank you for your time. We understand this wasn't the right fit. You're welcome to re-apply after a 3-day reflection period. We'll keep your profile on file."
     );
 
-    ctx.session.phase = "idle";
-    ctx.session.currentAgreementId = null;
-    ctx.session.selectedOpportunityId = null;
-    ctx.session.messageHistory = [];
-    ctx.session.negotiationContext = null;
+    resetSession(ctx);
+  } else if (ctx.session.phase === "awaiting_collabberry_signup") {
+    // Contributor typed a message instead of tapping the button. Re-prompt.
+    await ctx.reply(
+      "Once you've finished signing up on Collabberry, tap the button below to finish.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "I've signed up", callback_data: `resolution:linked:${agreementId}` }],
+          ],
+        },
+      }
+    );
   }
+}
+
+/**
+ * Create the agreement record in the Collabberry Beta App and mark the
+ * contributor hired. Idempotent: skips if the agreement already has a Beta App id,
+ * so a re-tap never double-creates (the backend also rejects re-submits with a
+ * 400, making this belt-and-suspenders). On-chain signing/minting is a separate
+ * manual admin action.
+ */
+async function createBetaAgreement(
+  ctx: BotContext,
+  agreement: Agreement,
+  contributor: Contributor
+): Promise<void> {
+  if (agreement.betaAppAgreementId) {
+    await ctx.reply("You're all set — your agreement already exists in Collabberry. Welcome to the team!");
+    return;
+  }
+  if (!contributor.collabberryUserId) {
+    console.error(`createBetaAgreement: contributor ${contributor.id} has no collabberryUserId`);
+    await ctx.reply(
+      "Your agreement is approved, but we couldn't link your Collabberry account. The admin has been notified and will finalize it."
+    );
+    return;
+  }
+
+  try {
+    const { betaAgreementId } = await ctx.beta.createAgreement({
+      userId: contributor.collabberryUserId,
+      roleName: agreement.roleName,
+      responsibilities: agreement.responsibilities,
+      hourlyRate: agreement.hourlyRate,
+      commitmentPercent: agreement.commitmentPercent,
+    });
+
+    if (betaAgreementId) {
+      await ctx.sheets.updateAgreementBetaId(agreement.id, betaAgreementId);
+    }
+    await ctx.sheets.updateContributor(contributor.id, { status: "hired" });
+
+    await ctx.reply(
+      "Done! Your agreement has been created in Collabberry. An admin will sign it on-chain and your TeamPoints will follow. Welcome to the team!"
+    );
+  } catch (err) {
+    console.error(`createBetaAgreement: failed for agreement ${agreement.id}:`, err);
+    await ctx.reply(
+      "Your Collabberry account is linked, but I hit an error creating the agreement. The admin has been notified and will finalize it."
+    );
+  }
+}
+
+function resetSession(ctx: BotContext): void {
+  ctx.session.phase = "idle";
+  ctx.session.currentAgreementId = null;
+  ctx.session.selectedOpportunityId = null;
+  ctx.session.messageHistory = [];
+  ctx.session.negotiationContext = null;
+}
+
+function handleForDisplay(handle: string): string {
+  const trimmed = (handle || "").trim();
+  if (!trimmed) return "your Telegram handle";
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }

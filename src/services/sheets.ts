@@ -115,54 +115,23 @@ export class SheetsService {
   async getContributor(telegramId: string): Promise<Contributor | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:M",
+      range: "Contributors!A2:P",
     });
 
     const rows = res.data.values || [];
     const row = rows.find((r) => r[1] === telegramId);
     if (!row) return null;
 
-    return {
-      id: row[0],
-      telegramId: row[1],
-      telegramHandle: row[2],
-      name: row[3],
-      skills: (row[4] || "").split(",").map((s: string) => s.trim()),
-      commitmentPercent: Number(row[5]),
-      desiredRate: { min: Number(row[6]), max: Number(row[7]) },
-      timezone: row[8] || "",
-      location: row[9] || "",
-      status: row[10] as Contributor["status"],
-      cooldownUntil: row[11] || null,
-      previousAttempts: Number(row[12]) || 0,
-      createdAt: row[13] || "",
-    };
+    return rowToContributor(row);
   }
 
   async addContributor(contributor: Contributor): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A:M",
+      range: "Contributors!A:P",
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            contributor.id,
-            contributor.telegramId,
-            contributor.telegramHandle,
-            contributor.name,
-            contributor.skills.join(", "),
-            contributor.commitmentPercent,
-            contributor.desiredRate.min,
-            contributor.desiredRate.max,
-            contributor.timezone,
-            contributor.location,
-            contributor.status,
-            contributor.cooldownUntil || "",
-            contributor.previousAttempts,
-            contributor.createdAt,
-          ],
-        ],
+        values: [contributorToRow(contributor)],
       },
     });
   }
@@ -170,43 +139,23 @@ export class SheetsService {
   async updateContributor(id: string, updates: Partial<Contributor>): Promise<boolean> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:M",
+      range: "Contributors!A2:P",
     });
 
     const rows = res.data.values || [];
     const index = rows.findIndex((r) => r[0] === id);
     if (index === -1) return false;
 
-    const row = rows[index]!;
-    const current = await this.getContributor(row[1]);
-    if (!current) return false;
-
+    const current = rowToContributor(rows[index]!);
     const updated = { ...current, ...updates } as Contributor;
     const rowNum = index + 2;
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `Contributors!A${rowNum}:M${rowNum}`,
+      range: `Contributors!A${rowNum}:P${rowNum}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            updated.id,
-            updated.telegramId,
-            updated.telegramHandle,
-            updated.name,
-            updated.skills.join(", "),
-            updated.commitmentPercent,
-            updated.desiredRate.min,
-            updated.desiredRate.max,
-            updated.timezone,
-            updated.location,
-            updated.status,
-            updated.cooldownUntil || "",
-            updated.previousAttempts,
-            updated.createdAt,
-          ],
-        ],
+        values: [contributorToRow(updated)],
       },
     });
     return true;
@@ -215,27 +164,13 @@ export class SheetsService {
   async getContributorById(id: string): Promise<Contributor | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:M",
+      range: "Contributors!A2:P",
     });
 
     const row = (res.data.values || []).find((r) => r[0] === id);
     if (!row) return null;
 
-    return {
-      id: row[0],
-      telegramId: row[1],
-      telegramHandle: row[2],
-      name: row[3],
-      skills: (row[4] || "").split(",").map((s: string) => s.trim()),
-      commitmentPercent: Number(row[5]),
-      desiredRate: { min: Number(row[6]), max: Number(row[7]) },
-      timezone: row[8] || "",
-      location: row[9] || "",
-      status: row[10] as Contributor["status"],
-      cooldownUntil: row[11] || null,
-      previousAttempts: Number(row[12]) || 0,
-      createdAt: row[13] || "",
-    };
+    return rowToContributor(row);
   }
 
   // --- Agreements ---
@@ -243,7 +178,7 @@ export class SheetsService {
   async getAgreement(id: string): Promise<Agreement | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Agreements!A2:L",
+      range: "Agreements!A2:P",
     });
 
     const row = (res.data.values || []).find((r) => r[0] === id);
@@ -265,6 +200,7 @@ export class SheetsService {
       negotiationRound: Number(row[10]) || 1,
       submittedAt: row[11] || "",
       reviewedAt: null,
+      betaAppAgreementId: row[15] || null,
     };
   }
 
@@ -448,6 +384,27 @@ export class SheetsService {
     return true;
   }
 
+  /** Stamp column P with the Collabberry agreement id once the bridge creates it. */
+  async updateAgreementBetaId(id: string, betaAppAgreementId: string): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:A",
+    });
+
+    const rows = res.data.values || [];
+    const index = rows.findIndex((r) => r[0] === id);
+    if (index === -1) return false;
+
+    const rowNum = index + 2;
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `Agreements!P${rowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[betaAppAgreementId]] },
+    });
+    return true;
+  }
+
   // --- Review Feedback ---
 
   async addReviewFeedback(
@@ -534,4 +491,50 @@ export class SheetsService {
       },
     });
   }
+}
+
+// --- Contributors row mapping (cols A..P) ---
+// A id, B telegramId, C telegramHandle, D name, E skills, F commitment%,
+// G rateMin, H rateMax, I timezone, J location, K status, L cooldownUntil,
+// M previousAttempts, N createdAt, O walletAddress, P collabberryUserId.
+
+function rowToContributor(row: any[]): Contributor {
+  return {
+    id: row[0],
+    telegramId: row[1],
+    telegramHandle: row[2],
+    name: row[3],
+    skills: (row[4] || "").split(",").map((s: string) => s.trim()),
+    commitmentPercent: Number(row[5]),
+    desiredRate: { min: Number(row[6]), max: Number(row[7]) },
+    timezone: row[8] || "",
+    location: row[9] || "",
+    status: row[10] as Contributor["status"],
+    cooldownUntil: row[11] || null,
+    previousAttempts: Number(row[12]) || 0,
+    createdAt: row[13] || "",
+    walletAddress: row[14] || null,
+    collabberryUserId: row[15] || null,
+  };
+}
+
+function contributorToRow(c: Contributor): (string | number)[] {
+  return [
+    c.id,
+    c.telegramId,
+    c.telegramHandle,
+    c.name,
+    c.skills.join(", "),
+    c.commitmentPercent,
+    c.desiredRate.min,
+    c.desiredRate.max,
+    c.timezone,
+    c.location,
+    c.status,
+    c.cooldownUntil || "",
+    c.previousAttempts,
+    c.createdAt,
+    c.walletAddress || "",
+    c.collabberryUserId || "",
+  ];
 }

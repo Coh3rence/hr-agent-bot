@@ -25,6 +25,11 @@ export interface Contributor {
   cooldownUntil: string | null;
   previousAttempts: number;
   createdAt: string;
+  // Captured when the contributor self-registers on Collabberry via the bot's
+  // invite link (wallet proven by their sign-up signature). These link the
+  // Telegram contributor to their Collabberry user for agreement creation.
+  walletAddress: string | null;
+  collabberryUserId: string | null;
 }
 
 export interface Agreement {
@@ -43,6 +48,9 @@ export interface Agreement {
   negotiationRound: number;
   submittedAt: string;
   reviewedAt: string | null;
+  // Set once the agreement is created in the Collabberry Beta App. Local
+  // idempotency guard so the bridge never double-POSTs the same agreement.
+  betaAppAgreementId: string | null;
 }
 
 export interface ReviewerFeedback {
@@ -81,7 +89,8 @@ export type ConversationPhase =
   | "negotiation"
   | "review"
   | "reviewer_feedback"
-  | "resolution";
+  | "resolution"
+  | "awaiting_collabberry_signup";
 
 export interface SessionData {
   phase: ConversationPhase;

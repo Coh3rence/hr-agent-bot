@@ -8,6 +8,20 @@ const envSchema = z.object({
   GOOGLE_PRIVATE_KEY: z.string().min(1, "Google service account private key is required"),
   BETA_APP_API_URL: z.string().url().default("https://beta.collabberry.xyz/api"),
   BETA_APP_JWT: z.string().optional(),
+  // Shared service-key for unattended bot auth (sent as X-Service-Key). The fork
+  // impersonates a designated org admin on a match, so the bot needs no wallet key
+  // and no weekly JWT rotation. Preferred over BETA_APP_JWT when set.
+  BETA_APP_SERVICE_KEY: z.string().optional(),
+  // Org the bot creates agreements in. Needed to read the contributor roster
+  // (GET /orgs/:id) when resolving a freshly-signed-up contributor to their userId.
+  BETA_APP_ORG_ID: z.string().optional(),
+  // Where the unique org-invite link points. The bot appends ?invitation=<token>.
+  BETA_APP_INVITE_URL: z.string().url().default("https://beta.collabberry.xyz/join"),
+  // FTE basis for hourly->monthly marketRate conversion (40h x 4wk). Client-confirmed
+  // 2026-06-30; env-overridable so the basis can change without a code edit.
+  FTE_HOURS_PER_MONTH: z.coerce.number().default(160),
+  // Fiat slice of monthly comp; remainder paid in TeamPoints. Default 0 = all TeamPoints.
+  DEFAULT_FIAT_REQUESTED: z.coerce.number().default(0),
   REVIEWER_TIMEOUT_HOURS: z.coerce.number().default(48),
   MAX_NEGOTIATION_ROUNDS: z.coerce.number().default(2),
   COOLDOWN_DAYS: z.coerce.number().default(3),

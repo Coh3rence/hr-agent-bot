@@ -79,6 +79,8 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
       cooldownUntil: null,
       previousAttempts: 0,
       createdAt: new Date().toISOString(),
+      walletAddress: null,
+      collabberryUserId: null,
     };
 
     const existing = await ctx.sheets.getContributor(telegramId);

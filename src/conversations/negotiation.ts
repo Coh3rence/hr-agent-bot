@@ -113,6 +113,7 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       negotiationRound: 1,
       submittedAt: new Date().toISOString(),
       reviewedAt: null,
+      betaAppAgreementId: null,
     };
 
     await ctx.sheets.addAgreement(agreement);

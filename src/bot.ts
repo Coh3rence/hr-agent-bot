@@ -8,6 +8,7 @@ import { handleReview } from "./conversations/review";
 import { handleResolution } from "./conversations/resolution";
 import { SheetsService } from "./services/sheets";
 import { ClaudeService } from "./services/claude";
+import { BetaAppService } from "./services/betaApp";
 import { sweepExpiredReviews, SWEEP_INTERVAL_MS } from "./services/timeout";
 import {
   handleAddOpportunity,
@@ -21,6 +22,7 @@ export type BotContext = Context &
   SessionFlavor<SessionData> & {
     sheets: SheetsService;
     claude: ClaudeService;
+    beta: BetaAppService;
   };
 
 const config = loadConfig();
@@ -30,11 +32,13 @@ const bot = new Bot<BotContext>(config.BOT_TOKEN);
 // Initialize services
 const sheets = new SheetsService(config);
 const claude = new ClaudeService(config);
+const beta = new BetaAppService(config);
 
 // Inject services into context
 bot.use((ctx, next) => {
   ctx.sheets = sheets;
   ctx.claude = claude;
+  ctx.beta = beta;
   return next();
 });
 
@@ -77,6 +81,7 @@ bot.on("message:text", async (ctx) => {
     review: handleReview,
     reviewer_feedback: handleReview,
     resolution: handleResolution,
+    awaiting_collabberry_signup: handleResolution,
   };
 
   const handler = handlers[phase];
