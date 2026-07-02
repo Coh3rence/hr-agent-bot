@@ -77,22 +77,88 @@ contributor's wallet/userId where the bot can read it (e.g. the sheet).
 
 > Open question sent to client: support both, or standardize on Path A?
 
+### Join key: the invite token, not the Telegram handle (decided)
+
+Path A step 3 needs a **join key** to link the freshly-signed-up Collabberry user
+back to the Telegram person the bot invited. Two candidates:
+
+- **Telegram handle** — what the code does *today* (`resolveByHandle` in
+  `src/services/betaApp.ts`): after signup the bot scans the org roster for a
+  contributor whose `telegramHandle` matches. **Fragile**, because the handle is
+  self-reported at signup:
+  - The invite-link signup form (`SignUpWithInviteLink.tsx`) has a Telegram Handle
+    field but it is **optional** (`Yup.string().notRequired()`) and free-typed — a
+    skipped or mistyped handle (`@alex` vs real `@alexus`) silently breaks the link.
+  - `createInviteLink()` mints a **shared org invite** (`GET /orgs/invitation`),
+    `usageLimit: 10` in the fork — one token is *not* 1:1 with a contributor, so the
+    token alone can't currently identify who signed up.
+
+- **Invite token** — the robust design, and the target. The bot mints a
+  **per-contributor** token (`usageLimit: 1`), stores `{token → telegramId}` in the
+  Contributors sheet at invite time, and after signup resolves `userId` by the
+  token the person redeemed. Signature proves wallet ownership; the token proves
+  it's *our* invited person. No handle typing, no fuzzy match. The Telegram-handle
+  field becomes optional metadata rather than the load-bearing key.
+
+**Decision:** standardize on the **invite token** as the join key. The blocker is
+purely on the fork — it does not persist which user redeemed a token today
+(`registerUser` in `user.service.ts` only does `usageCount += 1`; the `Invitation`
+entity in `orgInvitation.model.ts` has no redeemer/user link). Once the fork
+records and exposes token→userId (below), the bot swaps `resolveByHandle` for
+`resolveByToken`.
+
+### Can we combine the Telegram ID + the wallet signature?
+
+Two distinct facts get fused at signup, and it helps to be precise about what
+proves what:
+
+- **Wallet signature (SIWE)** proves *the person controls this wallet*. Strong,
+  cryptographic.
+- **Telegram ID** comes from *the bot*, which minted the invite and DM'd it to one
+  Telegram user. Its trust is "whoever the bot privately sent this single-use link
+  to" — operational, not cryptographic.
+
+The **token model already combines them**: the token carries the Telegram identity
+(via the bot's `{token → telegramId}` map), the signature carries wallet ownership,
+and redeeming the token fuses both into one Collabberry `userId`. That is enough
+for onboarding contributors the bot already trusts.
+
+Stronger cryptographic fusion — making the contributor **sign a message that
+embeds their Telegram ID** — is possible but a bigger lift (custom SIWE
+statement + backend verification), and it does **not** actually raise the trust
+floor on its own: the signer signs whatever Telegram ID the app puts in the
+message, so a forwarded link still binds the wrong wallet. Truly binding both
+sides needs a **Telegram-verified handshake** (e.g. Telegram Login Widget, or the
+contributor tapping a bot deep-link that the bot cross-checks) *alongside* the
+wallet sign. That is future hardening, out of scope for v1; the single-use,
+privately-DM'd link is the practical binding for now.
+
 ## Changes required
 
-### Fork (backend) — only for Path A linkage
-- `Invitation` entity: record **who redeemed** a token (not tracked today) and
-  support single-use tokens (`usageLimit = 1`).
-- Endpoint for the bot to resolve "which `userId` redeemed token X".
+### Fork (backend) — for token-as-join-key linkage
+- Mint **single-use** invites (`usageLimit = 1`) so a token maps to exactly one
+  signup. Today `createInviteLink` hits `GET /orgs/invitation` which defaults to
+  `usageLimit: 10`.
+- `registerUser` (`user.service.ts`): persist the redeemed `invitationToken` on the
+  new user. Add an `invitationToken` column to `user.model.ts` (nullable) and set
+  `user.invitationToken = userData.invitationToken`.
+- Surface it on the roster: add `invitationToken` to the `getOrgById`
+  contributor projection — same 1-line spot already used to expose `telegramHandle`.
 - (Already applied locally, unpushed) load the `agreement` relation in
   `addAgreement` so duplicates return 400 not 500.
 
 ### Bot
-- New service `src/services/beta-app.ts`: `getAgreement`, `createAgreement`,
-  `updateAgreement`, `createInvite`, `resolveUserIdByToken`. Bearer-authed.
-- `resolution.ts` `accept` branch: resolve userId → build payload (rate mapping
-  above) → GET-then-POST/PUT → handle 401/404/400/500.
-- Contributors sheet: add `collabberryUserId`, `collabberryInviteToken`
-  (optionally `walletAddress`). Cache userId once resolved.
+- `src/services/betaApp.ts`: replace `resolveByHandle(telegramHandle)` with
+  `resolveByToken(token)` — find the roster contributor whose `invitationToken`
+  matches the token we minted. `createInviteLink`, `getRoster`, `createAgreement`
+  already exist.
+- `createInviteLink()`: store the returned `token` in the Contributors sheet
+  against the contributor's `telegramId` (the `{token → telegramId}` map).
+- `resolution.ts` `accept` branch: mint invite (single-use) → on "I've signed up"
+  resolve userId via `resolveByToken` → build payload (rate mapping above) →
+  GET-then-POST/PUT → handle 401/404/400/500.
+- Contributors sheet: add `collabberryInviteToken` alongside the existing
+  `collabberryUserId` / `walletAddress`. Cache userId once resolved.
 - Config already has `BETA_APP_API_URL` (default ends in `/api`) and
   `BETA_APP_JWT` (optional). For local test: `BETA_APP_API_URL=http://localhost:3000/api`.
 

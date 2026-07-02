@@ -44,10 +44,10 @@ await sheets.spreadsheets.values.batchUpdate({
   requestBody: {
     valueInputOption: "USER_ENTERED",
     data: [
-      { range: "Contributors!O1:P1", values: [["walletAddress", "collabberryUserId"]] },
+      { range: "Contributors!O1:Q1", values: [["walletAddress", "collabberryUserId", "collabberryInviteToken"]] },
       { range: "Agreements!O1:P1", values: [["candidateNotifiedAt", "betaAppAgreementId"]] },
     ],
   },
 });
 
-console.log("Synced M3 header columns (Contributors O1:P1, Agreements O1:P1).");
+console.log("Synced M3 header columns (Contributors O1:Q1, Agreements O1:P1).");

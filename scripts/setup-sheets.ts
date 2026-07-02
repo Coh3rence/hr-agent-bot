@@ -109,12 +109,13 @@ async function main() {
           ]],
         },
         {
-          range: "Contributors!A1:P1",
+          range: "Contributors!A1:Q1",
           values: [[
             "id", "telegramId", "telegramHandle", "name",
             "skills", "commitmentPercent", "desiredRateMin", "desiredRateMax",
             "timezone", "location", "status", "cooldownUntil",
             "previousAttempts", "createdAt", "walletAddress", "collabberryUserId",
+            "collabberryInviteToken",
           ]],
         },
         {

@@ -2,14 +2,15 @@ import type { Env } from "../config";
 
 /**
  * One entry from the Collabberry org roster (GET /api/orgs/:orgId → data.contributors[]).
- * `telegramHandle` is only populated if the backend fork exposes it in the
- * getOrgById projection (1-line change); without it, handle resolution returns null.
+ * `invitationToken` is the join key (D-018): it's the single-use token the
+ * contributor redeemed at sign-up, exposed by the fork's getOrgById projection.
  */
 export interface RosterContributor {
   id: string;
   walletAddress: string | null;
   username: string | null;
   telegramHandle?: string | null;
+  invitationToken?: string | null;
   agreement?: { id: string } | null;
 }
 
@@ -82,7 +83,8 @@ export class BetaAppService {
     if (!token) throw new Error("createInviteLink: no invitationToken in response");
 
     const base = this.config.BETA_APP_INVITE_URL.replace(/\/+$/, "");
-    return { token, url: `${base}?invitation=${encodeURIComponent(token)}` };
+    const param = this.config.BETA_APP_INVITE_PARAM;
+    return { token, url: `${base}?${param}=${encodeURIComponent(token)}` };
   }
 
   async getRoster(): Promise<RosterContributor[]> {
@@ -102,14 +104,16 @@ export class BetaAppService {
   }
 
   /**
-   * Find the freshly-registered contributor by their Telegram handle (D-014).
-   * Requires the backend to expose telegramHandle on roster entries.
+   * Find the freshly-registered contributor by the invite token they redeemed
+   * (D-018). The token is minted single-use per contributor and stored bot-side
+   * against their Telegram id, so this is a deterministic match — no reliance on a
+   * self-reported Telegram handle. Requires the fork to expose invitationToken on
+   * roster entries.
    */
-  async resolveByHandle(telegramHandle: string): Promise<RosterContributor | null> {
-    const target = normalizeHandle(telegramHandle);
-    if (!target) return null;
+  async resolveByToken(token: string | null): Promise<RosterContributor | null> {
+    if (!token) return null;
     const roster = await this.getRoster();
-    return roster.find((c) => normalizeHandle(c.telegramHandle ?? "") === target) ?? null;
+    return roster.find((c) => c.invitationToken === token) ?? null;
   }
 
   /**
@@ -156,8 +160,4 @@ export class BetaAppService {
       null;
     return { betaAgreementId };
   }
-}
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().replace(/^@/, "").toLowerCase();
 }

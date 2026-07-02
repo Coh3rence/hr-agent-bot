@@ -15,8 +15,13 @@ const envSchema = z.object({
   // Org the bot creates agreements in. Needed to read the contributor roster
   // (GET /orgs/:id) when resolving a freshly-signed-up contributor to their userId.
   BETA_APP_ORG_ID: z.string().optional(),
-  // Where the unique org-invite link points. The bot appends ?invitation=<token>.
+  // Where the unique org-invite link points. The bot appends ?<param>=<token>.
   BETA_APP_INVITE_URL: z.string().url().default("https://beta.collabberry.xyz/join"),
+  // Query-param name carrying the invite token. Prod default is `invitation`; the
+  // local/staging Collabberry frontend reads `invitationToken`. Env-overridable so
+  // dev/staging can deep-link into a local frontend without a code change (and while
+  // the correct production value is still being confirmed).
+  BETA_APP_INVITE_PARAM: z.string().default("invitation"),
   // FTE basis for hourly->monthly marketRate conversion (40h x 4wk). Client-confirmed
   // 2026-06-30; env-overridable so the basis can change without a code edit.
   FTE_HOURS_PER_MONTH: z.coerce.number().default(160),

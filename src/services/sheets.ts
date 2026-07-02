@@ -115,7 +115,7 @@ export class SheetsService {
   async getContributor(telegramId: string): Promise<Contributor | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:P",
+      range: "Contributors!A2:Q",
     });
 
     const rows = res.data.values || [];
@@ -128,7 +128,7 @@ export class SheetsService {
   async addContributor(contributor: Contributor): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A:P",
+      range: "Contributors!A:Q",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [contributorToRow(contributor)],
@@ -139,7 +139,7 @@ export class SheetsService {
   async updateContributor(id: string, updates: Partial<Contributor>): Promise<boolean> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:P",
+      range: "Contributors!A2:Q",
     });
 
     const rows = res.data.values || [];
@@ -152,7 +152,7 @@ export class SheetsService {
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `Contributors!A${rowNum}:P${rowNum}`,
+      range: `Contributors!A${rowNum}:Q${rowNum}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [contributorToRow(updated)],
@@ -164,7 +164,7 @@ export class SheetsService {
   async getContributorById(id: string): Promise<Contributor | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Contributors!A2:P",
+      range: "Contributors!A2:Q",
     });
 
     const row = (res.data.values || []).find((r) => r[0] === id);
@@ -496,7 +496,8 @@ export class SheetsService {
 // --- Contributors row mapping (cols A..P) ---
 // A id, B telegramId, C telegramHandle, D name, E skills, F commitment%,
 // G rateMin, H rateMax, I timezone, J location, K status, L cooldownUntil,
-// M previousAttempts, N createdAt, O walletAddress, P collabberryUserId.
+// M previousAttempts, N createdAt, O walletAddress, P collabberryUserId,
+// Q collabberryInviteToken.
 
 function rowToContributor(row: any[]): Contributor {
   return {
@@ -515,6 +516,7 @@ function rowToContributor(row: any[]): Contributor {
     createdAt: row[13] || "",
     walletAddress: row[14] || null,
     collabberryUserId: row[15] || null,
+    collabberryInviteToken: row[16] || null,
   };
 }
 
@@ -536,5 +538,6 @@ function contributorToRow(c: Contributor): (string | number)[] {
     c.createdAt,
     c.walletAddress || "",
     c.collabberryUserId || "",
+    c.collabberryInviteToken || "",
   ];
 }

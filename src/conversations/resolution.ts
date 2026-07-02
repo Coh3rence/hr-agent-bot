@@ -60,12 +60,16 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     // we never ask them to type a wallet in chat.
     try {
       const invite = await ctx.beta.createInviteLink();
+      // Persist the token as the join key (D-018): after sign-up we resolve the
+      // contributor by the token they redeemed, not by a self-reported handle.
+      await ctx.sheets.updateContributor(contributor.id, {
+        collabberryInviteToken: invite.token,
+      });
       await ctx.reply(
         "Congratulations — your agreement is approved! One quick step to finalize.\n\n" +
-          `1. Open your Collabberry invite: ${invite.url}\n` +
-          "2. Sign up by connecting and signing with your wallet — this proves ownership and is where your TeamPoints are paid.\n" +
-          `3. Use your Telegram handle ${handleForDisplay(contributor.telegramHandle)} exactly when asked.\n\n` +
-          "When you're done, tap the button below and I'll create your agreement automatically.",
+          `1. Open your personal Collabberry invite: ${invite.url}\n` +
+          "2. Sign up by connecting and signing with your wallet — this proves ownership and is where your TeamPoints are paid.\n\n" +
+          "This link is unique to you, so I'll link your account automatically. When you're done, tap the button below.",
         {
           reply_markup: {
             inline_keyboard: [
@@ -85,18 +89,17 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     }
   } else if (action === "linked") {
     // Contributor reports they've finished Collabberry sign-up. Resolve them on
-    // the org roster by Telegram handle, capture the verified wallet + userId,
-    // then create the agreement (D-014).
+    // the org roster by the invite token they redeemed, capture the verified
+    // wallet + userId, then create the agreement (D-018).
     const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
     if (!contributor) return;
 
     try {
-      const match = await ctx.beta.resolveByHandle(contributor.telegramHandle);
+      const match = await ctx.beta.resolveByToken(contributor.collabberryInviteToken);
       if (!match || !match.walletAddress) {
         await ctx.reply(
-          "I couldn't find your Collabberry sign-up yet. Make sure you finished signing up and " +
-            `used your Telegram handle ${handleForDisplay(contributor.telegramHandle)} exactly, ` +
-            'then tap "I\'ve signed up" again.',
+          "I couldn't find your Collabberry sign-up yet. Make sure you finished signing up " +
+            'through the invite link I sent, then tap "I\'ve signed up" again.',
           {
             reply_markup: {
               inline_keyboard: [
@@ -229,10 +232,4 @@ function resetSession(ctx: BotContext): void {
   ctx.session.selectedOpportunityId = null;
   ctx.session.messageHistory = [];
   ctx.session.negotiationContext = null;
-}
-
-function handleForDisplay(handle: string): string {
-  const trimmed = (handle || "").trim();
-  if (!trimmed) return "your Telegram handle";
-  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }

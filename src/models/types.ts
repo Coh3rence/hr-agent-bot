@@ -30,6 +30,10 @@ export interface Contributor {
   // Telegram contributor to their Collabberry user for agreement creation.
   walletAddress: string | null;
   collabberryUserId: string | null;
+  // The single-use invite token minted for this contributor. It is the join key
+  // (D-018): after sign-up we resolve the Collabberry user by the token they
+  // redeemed, rather than by a self-reported Telegram handle.
+  collabberryInviteToken: string | null;
 }
 
 export interface Agreement {

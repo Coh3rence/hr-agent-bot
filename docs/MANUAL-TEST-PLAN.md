@@ -260,6 +260,64 @@ DM with Approve / Counter / Reject buttons.
 
 ---
 
+## Beta App linkage — invite-token join key (D-018)
+
+Proves the contributor↔Collabberry link uses the **single-use invite token**, not
+the Telegram handle. Needs the fork running (`docker compose up -d --build`), the
+Collabberry frontend on `:5173`, and `.env`/`.env.development` pointed at the fork
+(`BETA_APP_API_URL`, `BETA_APP_SERVICE_KEY`, `BETA_APP_ORG_ID`).
+
+> Fork gotcha: `agreements.user_id` is UNIQUE — **use a fresh wallet each run**, or
+> clear the prior user's agreement, else `createAgreement` returns 400.
+
+### L1. Token minted single-use and persisted on accept
+- **Setup:** a contributor with an empty `collabberryUserId` reaches the Accept tap.
+- **Steps:** tap **Accept**.
+- **Expected:** the bot DMs a personal invite link; the contributor's Contributors
+  row **column Q (`collabberryInviteToken`)** is populated with the token that
+  appears in the invite URL; session phase = `awaiting_collabberry_signup`. In the
+  fork DB the `invitations` row for that token has `usageLimit = 1`.
+- [ ] Pass
+
+### L2. `resolveByToken` links the freshly-signed-up user
+- **Setup:** after L1, open the invite link in the frontend, connect a **fresh
+  wallet**, sign (SIWE), and complete sign-up.
+- **Steps:** back in Telegram, tap **"I've signed up"**.
+- **Expected:** the bot resolves the user by the **token** (not the handle), writes
+  `walletAddress` + `collabberryUserId` to the Contributors row, creates the
+  agreement in the fork (`marketRate = hourly×160`, correct commitment, `fiat 0`),
+  writes `betaAppAgreementId`, marks the contributor `hired`, and DMs success.
+- [ ] Pass
+
+### L3. Retry when sign-up isn't finished yet
+- **Setup:** after L1, tap **"I've signed up"** *before* completing sign-up.
+- **Expected:** the bot replies it couldn't find the sign-up yet and re-offers the
+  button; no partial writes, no crash. Completing sign-up then tapping again → L2.
+- [ ] Pass
+
+### L4. Handle is no longer load-bearing (regression of the old join key)
+- **Setup:** run L2 but **leave the Telegram Handle field blank** (or type a wrong
+  handle) during sign-up.
+- **Expected:** linking still succeeds via the token — proves the handle no longer
+  gates resolution.
+- [ ] Pass
+
+### L5. Already-linked contributor skips the invite path
+- **Setup:** a contributor whose row already has `collabberryUserId` taps Accept.
+- **Expected:** the bot creates the agreement immediately — no invite link, no token
+  write. Idempotent: if `betaAppAgreementId` is already set, it reports "already
+  exists" and does not double-create.
+- [ ] Pass
+
+### L6. Pre-existing contributors without a token are unaffected
+- **Setup:** an old Contributors row with an empty column Q and no
+  `collabberryUserId` taps Accept.
+- **Expected:** the normal invite-mint path runs and writes a fresh token to Q;
+  nothing errors on the previously-empty cell.
+- [ ] Pass
+
+---
+
 ## Quick reference — expected aggregation outcomes
 
 | Reviewer decisions | outcome | suggested rate | summary |

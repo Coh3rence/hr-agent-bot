@@ -1,17 +1,21 @@
 /**
  * Integration test for the M3 Beta App bridge against a running backend fork.
  * Exercises the real BetaAppService methods (the same code the bot calls):
- * invite-link mint, roster read, telegramHandle resolution, hourly->monthly
+ * invite-link mint, roster read, invite-token resolution (D-018), hourly->monthly
  * conversion, and agreement creation. Requires the fork up + bot .env pointed
  * at it (BETA_APP_API_URL, BETA_APP_SERVICE_KEY, BETA_APP_ORG_ID).
  *
- * Usage: bun scripts/test-bridge.ts --handle <telegramHandle>
+ * Pass --token <invitationToken> of an already-signed-up contributor to exercise
+ * resolveByToken; without it the resolution step falls back to the first roster
+ * entry so createAgreement can still run.
+ *
+ * Usage: bun scripts/test-bridge.ts [--token <invitationToken>]
  */
 import { loadConfig } from "../src/config";
 import { BetaAppService } from "../src/services/betaApp";
 
-const hIdx = process.argv.indexOf("--handle");
-const handle = hIdx >= 0 ? process.argv[hIdx + 1]! : "testnewbie";
+const tIdx = process.argv.indexOf("--token");
+const token = tIdx >= 0 ? process.argv[tIdx + 1]! : "";
 
 const config = loadConfig();
 const beta = new BetaAppService(config);
@@ -28,9 +32,15 @@ console.log(`API: ${config.BETA_APP_API_URL}  org: ${config.BETA_APP_ORG_ID}\n`)
 const invite = await beta.createInviteLink();
 check("createInviteLink", !!invite.token && invite.url.includes("invitation="), invite.url);
 
-// 2. roster read + telegramHandle resolution
-const resolved = await beta.resolveByHandle(handle);
-check("resolveByHandle", !!resolved, resolved ? `${resolved.username} -> ${resolved.id}` : `no match for @${handle}`);
+// 2. roster read + invite-token resolution (D-018)
+const resolved = token
+  ? await beta.resolveByToken(token)
+  : (await beta.getRoster())[0] ?? null;
+check(
+  token ? "resolveByToken" : "roster[0] (no --token)",
+  !!resolved,
+  resolved ? `${resolved.username} -> ${resolved.id}` : token ? `no match for token ${token}` : "empty roster"
+);
 
 // 3. hourly -> monthly (D-013: 50/hr * 160 = 8000)
 const monthly = beta.hourlyToMonthly(50);
@@ -47,7 +57,7 @@ if (resolved) {
   });
   check("createAgreement", !!res.betaAgreementId, `betaAgreementId=${res.betaAgreementId}`);
 } else {
-  check("createAgreement", false, "skipped — resolveByHandle returned null");
+  check("createAgreement", false, "skipped — no resolved user");
 }
 
 console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILURE(S)`}`);
