@@ -11,24 +11,13 @@
  * Skips scenario 13 (sheet-write failure) — needs failure injection.
  */
 import { google, sheets_v4 } from "googleapis";
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { loadEnv } from "./_env";
 import { SheetsService } from "../src/services/sheets";
 import { ClaudeService } from "../src/services/claude";
 import { aggregateForAgreement } from "../src/services/aggregation";
 import type { CounterOffer } from "../src/models/types";
 
-const envPath = resolve(import.meta.dir, "../.env");
-const env: Record<string, string> = {};
-for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-  const t = line.trim();
-  if (!t || t.startsWith("#")) continue;
-  const i = t.indexOf("=");
-  if (i === -1) continue;
-  let v = t.slice(i + 1);
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  env[t.slice(0, i)] = v;
-}
+const env = loadEnv();
 
 const keep = process.argv.includes("--keep");
 const onlyIdx = process.argv.indexOf("--only");

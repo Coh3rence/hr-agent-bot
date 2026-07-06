@@ -8,20 +8,9 @@
  *   bun scripts/sync-headers.ts --sheet-id <id>
  */
 import { google } from "googleapis";
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { loadEnv } from "./_env";
 
-const envPath = resolve(import.meta.dir, "../.env");
-const env: Record<string, string> = {};
-for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-  const t = line.trim();
-  if (!t || t.startsWith("#")) continue;
-  const i = t.indexOf("=");
-  if (i === -1) continue;
-  let v = t.slice(i + 1);
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  env[t.slice(0, i)] = v;
-}
+const env = loadEnv();
 
 const idIdx = process.argv.indexOf("--sheet-id");
 const spreadsheetId = idIdx >= 0 ? process.argv[idIdx + 1] : env.GOOGLE_SHEETS_ID;

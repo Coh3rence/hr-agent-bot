@@ -9,30 +9,7 @@
  */
 
 import { google } from "googleapis";
-import { readFileSync } from "fs";
-import { resolve } from "path";
-
-const envPath = resolve(import.meta.dir, "../.env");
-
-// Parse .env manually since this is a standalone script
-function loadEnv() {
-  const content = readFileSync(envPath, "utf-8");
-  const vars: Record<string, string> = {};
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx);
-    let value = trimmed.slice(eqIdx + 1);
-    // Strip surrounding quotes
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    vars[key] = value;
-  }
-  return vars;
-}
+import { loadEnv } from "./_env";
 
 const env = loadEnv();
 const spreadsheetId = env.GOOGLE_SHEETS_ID;

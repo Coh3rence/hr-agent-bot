@@ -17,8 +17,7 @@
  *   bun scripts/ensure-reviewfeedback-tab.ts --sheet-id <id> # target a specific sheet (e.g. dev)
  */
 import { google } from "googleapis";
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { loadEnv } from "./_env";
 
 const CANONICAL_HEADERS = [
   "agreementId",
@@ -30,17 +29,7 @@ const CANONICAL_HEADERS = [
   "submittedAt",
 ];
 
-const envPath = resolve(import.meta.dir, "../.env");
-const env: Record<string, string> = {};
-for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-  const t = line.trim();
-  if (!t || t.startsWith("#")) continue;
-  const i = t.indexOf("=");
-  if (i === -1) continue;
-  let v = t.slice(i + 1);
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  env[t.slice(0, i)] = v;
-}
+const env = loadEnv();
 
 const sheetIdIdx = process.argv.indexOf("--sheet-id");
 const sheetIdOverride = sheetIdIdx >= 0 ? process.argv[sheetIdIdx + 1] : null;
