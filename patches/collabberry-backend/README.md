@@ -22,6 +22,7 @@ All three sit side-by-side under `~/Desktop/development/`.
 | `68e19c2` | fix(agreement): load agreement relation so duplicate create returns 400 |
 | `ca8d53a` | feat: service-key auth for unattended bot + telegramHandle on roster |
 | `6454176` | feat: persist redeemed invite token for the bot's token join key (D-018) |
+| `ec46c39` | fix(register): skip S3 avatar upload when AWS is not configured |
 
 ## Restore into a backend clone
 
