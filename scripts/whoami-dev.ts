@@ -10,3 +10,4 @@ console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("GOOGLE_SHEETS_ID:", config.GOOGLE_SHEETS_ID);
 console.log("selfReviewAllowed():", selfReviewAllowed());
 console.log("BETA_APP_API_URL:", config.BETA_APP_API_URL);
+console.log("BETA_APP_ORG_ID:", config.BETA_APP_ORG_ID);
