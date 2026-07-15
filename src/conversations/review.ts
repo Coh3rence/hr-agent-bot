@@ -69,6 +69,44 @@ export async function handleReview(ctx: BotContext): Promise<void> {
   }
 }
 
+export interface ParsedCounter {
+  suggestedRate: number | null;
+  suggestedCommitment: number | null;
+  qualitative: string;
+}
+
+/**
+ * Parse a reviewer's free-text counter-offer into structured levers + prose.
+ * Pure (no I/O) so it can be unit-tested without the Telegram flow.
+ *   - Rate = a LEADING bare number (the prompt asks the reviewer to "start with
+ *     the number"). A number followed by a digit or % is not a rate, so
+ *     "we need a commitment of 50%" is never misread as $50/hr.
+ *   - Commitment = a number immediately followed by % anywhere in the message,
+ *     e.g. "bump commitment to 50%". Leading bare number (rate) and number+%
+ *     (commitment) don't collide, so we scan the original text for the percent.
+ *   - Everything left over rides through as qualitative feedback.
+ */
+export function parseCounterFeedback(text: string): ParsedCounter {
+  let suggestedRate: number | null = null;
+  let suggestedCommitment: number | null = null;
+  let qualitative = text.trim();
+
+  const rateMatch = text.match(/^\s*\$?(\d+(?:\.\d+)?)(?![\d%])/);
+  if (rateMatch) {
+    suggestedRate = Number(rateMatch[1]);
+    qualitative = text.slice(rateMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
+  }
+
+  const commitmentMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (commitmentMatch) {
+    suggestedCommitment = Number(commitmentMatch[1]);
+  }
+
+  if (!qualitative) qualitative = "(no qualitative feedback provided)";
+
+  return { suggestedRate, suggestedCommitment, qualitative };
+}
+
 async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<void> {
   const agreementId = ctx.session.pendingReviewAgreementId;
   const decision = ctx.session.pendingReviewDecision;
@@ -82,22 +120,10 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
   let qualitative = text.trim();
 
   if (decision === "counter") {
-    // Rate = a LEADING bare number (the prompt asks the reviewer to "start with
-    // the number"). A number followed by a digit or % is not a rate, so
-    // "we need a commitment of 50%" is never misread as $50/hr.
-    const rateMatch = text.match(/^\s*\$?(\d+(?:\.\d+)?)(?![\d%])/);
-    if (rateMatch) {
-      suggestedRate = Number(rateMatch[1]);
-      qualitative = text.slice(rateMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
-    }
-    // Commitment = a number immediately followed by % anywhere in the message,
-    // e.g. "bump commitment to 50%". Rate (leading bare number) and commitment
-    // (number+%) don't collide, so scan the original text for the percentage.
-    const commitmentMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
-    if (commitmentMatch) {
-      suggestedCommitment = Number(commitmentMatch[1]);
-    }
-    if (!qualitative) qualitative = "(no qualitative feedback provided)";
+    const parsed = parseCounterFeedback(text);
+    suggestedRate = parsed.suggestedRate;
+    suggestedCommitment = parsed.suggestedCommitment;
+    qualitative = parsed.qualitative;
   }
 
   const ok = await recordReviewerDecision(
