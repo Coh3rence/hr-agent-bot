@@ -72,12 +72,12 @@ async function ensureReviewFeedbackTab(): Promise<void> {
   });
   await raw.spreadsheets.values.update({
     spreadsheetId: cfg.GOOGLE_SHEETS_ID,
-    range: "ReviewFeedback!A1:G1",
+    range: "ReviewFeedback!A1:H1",
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[
         "agreementId", "reviewerId", "reviewerName", "decision",
-        "suggestedRate", "qualitativeFeedback", "submittedAt",
+        "suggestedRate", "qualitativeFeedback", "submittedAt", "suggestedCommitment",
       ]],
     },
   });
@@ -108,15 +108,17 @@ async function seedFeedback(
   suggestedRate: number | null,
   qualitativeFeedback: string,
   submittedAt?: string,
+  suggestedCommitment: number | null = null,
 ): Promise<void> {
   await raw.spreadsheets.values.append({
     spreadsheetId: cfg.GOOGLE_SHEETS_ID,
-    range: "ReviewFeedback!A:G",
+    range: "ReviewFeedback!A:H",
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[
         agreementId, reviewerId, `Reviewer-${reviewerId}`, decision,
         suggestedRate ?? "", qualitativeFeedback, submittedAt ?? new Date().toISOString(),
+        suggestedCommitment ?? "",
       ]],
     },
   });
@@ -264,6 +266,32 @@ await scenario(12, "outlier 10/60/65 (D-001 limitation)", async (aid) => {
 }, (r) => ({
   ok: r?.suggestedRate === 45 && r?.outcome === "mixed",
   detail: `rate=${r?.suggestedRate} (mean per D-001) outcome=${r?.outcome}`,
+}));
+
+// --- Commitment counter scenarios (widen: reviewers counter on commitment %) ---
+
+await scenario(20, "mixed commitment counters 40/50/60 (rate null)", async (aid) => {
+  await seedFeedback(aid, "R1", "counter", null, "commitment too low", undefined, 40);
+  await seedFeedback(aid, "R2", "counter", null, "needs more skin in the game", undefined, 50);
+  await seedFeedback(aid, "R3", "counter", null, "ok-ish", undefined, 60);
+}, (r) => ({
+  ok: r?.suggestedRate === null && r?.suggestedCommitment === 50 && r?.outcome === "mixed",
+  detail: `rate=${r?.suggestedRate} commitment=${r?.suggestedCommitment} outcome=${r?.outcome}`,
+}));
+
+await scenario(21, "single counter, rate + commitment (pass-through)", async (aid) => {
+  await seedFeedback(aid, "R1", "counter", 70, "lower rate, higher commitment", undefined, 60);
+}, (r) => ({
+  ok: r?.suggestedRate === 70 && r?.suggestedCommitment === 60 && r?.outcome === "mixed",
+  detail: `rate=${r?.suggestedRate} commitment=${r?.suggestedCommitment} outcome=${r?.outcome}`,
+}));
+
+await scenario(22, "all approve keeps original commitment (50)", async (aid) => {
+  await seedFeedback(aid, "R1", "approve", null, "");
+  await seedFeedback(aid, "R2", "approve", null, "");
+}, (r) => ({
+  ok: r?.suggestedRate === 60 && r?.suggestedCommitment === 50 && r?.outcome === "all_approve",
+  detail: `rate=${r?.suggestedRate} commitment=${r?.suggestedCommitment} outcome=${r?.outcome}`,
 }));
 
 // Scenario 14: missing id — no setup needed.

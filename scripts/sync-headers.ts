@@ -35,8 +35,16 @@ await sheets.spreadsheets.values.batchUpdate({
     data: [
       { range: "Contributors!O1:Q1", values: [["walletAddress", "collabberryUserId", "collabberryInviteToken"]] },
       { range: "Agreements!O1:P1", values: [["candidateNotifiedAt", "betaAppAgreementId"]] },
+      { range: "Agreements!Q1", values: [["aggregatedCommitment"]] },
+      {
+        range: "ReviewFeedback!A1:H1",
+        values: [[
+          "agreementId", "reviewerId", "reviewerName", "decision",
+          "suggestedRate", "qualitativeFeedback", "submittedAt", "suggestedCommitment",
+        ]],
+      },
     ],
   },
 });
 
-console.log("Synced M3 header columns (Contributors O1:Q1, Agreements O1:P1).");
+console.log("Synced header columns (Contributors O1:Q1, Agreements O1:P1 + Q1, ReviewFeedback A1:H1).");
