@@ -30,11 +30,14 @@ export async function buildModifyContext(
 
   const offer = await sheets.getCandidateOffer(agreementId);
   if (offer) {
-    const rateClause =
-      offer.suggestedRate != null
-        ? `countered at $${offer.suggestedRate}/hr`
-        : `responded without proposing a new rate`;
-    lines.push(`The core team reviewed it and ${rateClause}. ${offer.qualitativeSummary}`);
+    const terms: string[] = [];
+    if (offer.suggestedRate != null) terms.push(`$${offer.suggestedRate}/hr`);
+    if (offer.suggestedCommitment != null) terms.push(`${offer.suggestedCommitment}% commitment`);
+    const clause =
+      terms.length > 0
+        ? `countered at ${terms.join(", ")}`
+        : `responded without proposing new terms`;
+    lines.push(`The core team reviewed it and ${clause}. ${offer.qualitativeSummary}`);
   }
 
   const feedbacks = await sheets.getReviewFeedbacks(agreementId);
@@ -42,8 +45,11 @@ export async function buildModifyContext(
     .map((f) => {
       const reason = f.qualitativeFeedback?.trim();
       if (!reason) return null;
-      const rate = f.suggestedRate != null ? ` (suggested $${f.suggestedRate}/hr)` : "";
-      return `- ${f.decision}${rate}: ${reason}`;
+      const terms: string[] = [];
+      if (f.suggestedRate != null) terms.push(`$${f.suggestedRate}/hr`);
+      if (f.suggestedCommitment != null) terms.push(`${f.suggestedCommitment}% commitment`);
+      const suffix = terms.length > 0 ? ` (suggested ${terms.join(", ")})` : "";
+      return `- ${f.decision}${suffix}: ${reason}`;
     })
     .filter((n): n is string => n !== null);
 

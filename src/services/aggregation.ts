@@ -14,14 +14,19 @@ export async function aggregateForAgreement(
   }
 
   const feedbacks = await sheets.getReviewFeedbacks(agreementId);
-  const result = await claude.aggregateFeedback(feedbacks, agreement.hourlyRate);
+  const result = await claude.aggregateFeedback(
+    feedbacks,
+    agreement.hourlyRate,
+    agreement.commitmentPercent
+  );
   if (!result) return null;
 
   try {
     await sheets.updateAgreementAggregation(
       agreementId,
       result.suggestedRate,
-      result.qualitativeSummary
+      result.qualitativeSummary,
+      result.suggestedCommitment
     );
   } catch (err) {
     console.error(

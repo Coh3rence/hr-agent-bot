@@ -62,12 +62,14 @@ export interface ReviewerFeedback {
   reviewerName: string;
   decision: "approve" | "counter" | "reject";
   suggestedRate: number | null;
+  suggestedCommitment: number | null;
   qualitativeFeedback: string;
   submittedAt: string;
 }
 
 export interface CounterOffer {
   suggestedRate: number | null;
+  suggestedCommitment: number | null;
   qualitativeSummary: string;
   outcome: "all_approve" | "mixed" | "all_reject";
   reviewerCount: number;

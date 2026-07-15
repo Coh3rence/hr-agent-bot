@@ -31,7 +31,7 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     await ctx.reply("No problem. What would you like to change? You can update your rate, commitment %, or duration.");
   } else if (data.startsWith("review:approve:")) {
     const agreementId = data.replace("review:approve:", "");
-    const ok = await recordReviewerDecision(ctx, agreementId, "approve", null, "");
+    const ok = await recordReviewerDecision(ctx, agreementId, "approve", null, null, "");
     if (ok) {
       await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
       await ctx.reply("Approval recorded. Thanks.");
@@ -49,9 +49,11 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     ctx.session.phase = "reviewer_feedback";
     await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
     await ctx.reply(
-      "Please send your counter-offer in a single message:\n\n" +
-        "Start with the suggested rate (just the number), then your feedback.\n\n" +
-        "Example: `60 - experience is thin for senior level, would consider at a lower tier`",
+      "Please send your counter-offer in a single message. You can suggest a new " +
+        "rate, a new commitment %, or both — plus your feedback:\n\n" +
+        "• Rate — start with the number (e.g. `60`)\n" +
+        "• Commitment — write it as a percentage (e.g. `50%`)\n\n" +
+        "Example: `60, commitment should be 50% - experience is thin for senior level`",
       { parse_mode: "Markdown" }
     );
   } else if (data.startsWith("review:reject:")) {
@@ -76,18 +78,36 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
   }
 
   let suggestedRate: number | null = null;
+  let suggestedCommitment: number | null = null;
   let qualitative = text.trim();
 
   if (decision === "counter") {
-    const match = text.match(/\$?(\d+(?:\.\d+)?)/);
-    if (match) {
-      suggestedRate = Number(match[1]);
-      qualitative = text.replace(match[0], "").replace(/^[\s\-:,.]+/, "").trim();
+    // Rate = a LEADING bare number (the prompt asks the reviewer to "start with
+    // the number"). A number followed by a digit or % is not a rate, so
+    // "we need a commitment of 50%" is never misread as $50/hr.
+    const rateMatch = text.match(/^\s*\$?(\d+(?:\.\d+)?)(?![\d%])/);
+    if (rateMatch) {
+      suggestedRate = Number(rateMatch[1]);
+      qualitative = text.slice(rateMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
+    }
+    // Commitment = a number immediately followed by % anywhere in the message,
+    // e.g. "bump commitment to 50%". Rate (leading bare number) and commitment
+    // (number+%) don't collide, so scan the original text for the percentage.
+    const commitmentMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (commitmentMatch) {
+      suggestedCommitment = Number(commitmentMatch[1]);
     }
     if (!qualitative) qualitative = "(no qualitative feedback provided)";
   }
 
-  const ok = await recordReviewerDecision(ctx, agreementId, decision, suggestedRate, qualitative);
+  const ok = await recordReviewerDecision(
+    ctx,
+    agreementId,
+    decision,
+    suggestedRate,
+    suggestedCommitment,
+    qualitative
+  );
 
   if (!ok) {
     // Keep the pending decision + phase so the reviewer can resend the same
@@ -102,10 +122,17 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
   ctx.session.pendingReviewDecision = null;
   ctx.session.phase = "idle";
 
-  const summary =
-    decision === "counter"
-      ? `Counter-offer recorded${suggestedRate !== null ? ` at $${suggestedRate}/hr` : ""}. Thanks.`
-      : `Rejection recorded. Thanks.`;
+  let summary: string;
+  if (decision === "counter") {
+    const parts: string[] = [];
+    if (suggestedRate !== null) parts.push(`$${suggestedRate}/hr`);
+    if (suggestedCommitment !== null) parts.push(`${suggestedCommitment}% commitment`);
+    summary = parts.length
+      ? `Counter-offer recorded at ${parts.join(", ")}. Thanks.`
+      : `Counter-offer recorded. Thanks.`;
+  } else {
+    summary = `Rejection recorded. Thanks.`;
+  }
   await ctx.reply(summary);
 
   await maybeCompleteReview(ctx, agreementId);
@@ -116,6 +143,7 @@ async function recordReviewerDecision(
   agreementId: string,
   decision: ReviewerFeedback["decision"],
   suggestedRate: number | null,
+  suggestedCommitment: number | null,
   qualitativeFeedback: string
 ): Promise<boolean> {
   const reviewerId = ctx.from?.id?.toString() ?? "";
@@ -127,6 +155,7 @@ async function recordReviewerDecision(
     reviewerName,
     decision,
     suggestedRate,
+    suggestedCommitment,
     qualitativeFeedback,
     submittedAt: new Date().toISOString(),
   };

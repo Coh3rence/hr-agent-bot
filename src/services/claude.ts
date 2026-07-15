@@ -179,7 +179,8 @@ Return matches sorted by overallScore descending.`;
 
   async aggregateFeedback(
     feedbacks: ReviewerFeedback[],
-    originalRate?: number
+    originalRate?: number,
+    originalCommitment?: number
   ): Promise<CounterOffer | null> {
     const unique = dedupLatestPerReviewer(feedbacks);
     if (unique.length === 0) return null;
@@ -193,6 +194,7 @@ Return matches sorted by overallScore descending.`;
     if (allApprove) {
       return {
         suggestedRate: originalRate ?? null,
+        suggestedCommitment: originalCommitment ?? null,
         qualitativeSummary: "All reviewers approved.",
         outcome: "all_approve",
         reviewerCount: unique.length,
@@ -207,6 +209,7 @@ Return matches sorted by overallScore descending.`;
         .filter((r): r is string => !!r);
       return {
         suggestedRate: null,
+        suggestedCommitment: null,
         qualitativeSummary: reasons.length
           ? `Reviewers declined. Reasons: ${reasons.join("; ")}.`
           : "Reviewers declined without giving reasons.",
@@ -221,6 +224,7 @@ Return matches sorted by overallScore descending.`;
       const sole = unique[0]!;
       return {
         suggestedRate: sole.suggestedRate,
+        suggestedCommitment: sole.suggestedCommitment,
         qualitativeSummary:
           sole.qualitativeFeedback?.trim() || "(no feedback provided)",
         outcome: "mixed",
@@ -229,25 +233,23 @@ Return matches sorted by overallScore descending.`;
       };
     }
 
-    // Mixed multi: D-001 mean of counter rates, Claude synthesis of qualitative.
-    const counterRates = unique
-      .filter((f) => f.decision === "counter" && f.suggestedRate !== null)
-      .map((f) => f.suggestedRate as number);
-    const meanRate =
-      counterRates.length > 0
-        ? Math.round(
-            counterRates.reduce((a, b) => a + b, 0) / counterRates.length
-          )
-        : null;
+    // Mixed multi: D-001 mean of counter rates/commitments, Claude synthesis of qualitative.
+    const meanRate = meanOfCounters(unique, "suggestedRate");
+    const meanCommitment = meanOfCounters(unique, "suggestedCommitment");
 
     const feedbackText = unique
       .map((f) => {
-        const stance =
-          f.decision === "approve"
-            ? "approved"
-            : f.decision === "counter"
-              ? `countered${f.suggestedRate !== null ? ` at $${f.suggestedRate}/hr` : ""}`
-              : "rejected";
+        let stance: string;
+        if (f.decision === "approve") {
+          stance = "approved";
+        } else if (f.decision === "counter") {
+          const terms: string[] = [];
+          if (f.suggestedRate !== null) terms.push(`$${f.suggestedRate}/hr`);
+          if (f.suggestedCommitment !== null) terms.push(`${f.suggestedCommitment}% commitment`);
+          stance = `countered${terms.length ? ` at ${terms.join(", ")}` : ""}`;
+        } else {
+          stance = "rejected";
+        }
         return `Reviewer (${stance}): ${f.qualitativeFeedback?.trim() || "(no comment)"}`;
       })
       .join("\n");
@@ -259,6 +261,7 @@ Return matches sorted by overallScore descending.`;
 
     return {
       suggestedRate: meanRate,
+      suggestedCommitment: meanCommitment,
       qualitativeSummary: summary,
       outcome: "mixed",
       reviewerCount: unique.length,
@@ -278,11 +281,23 @@ function dedupLatestPerReviewer(feedbacks: ReviewerFeedback[]): ReviewerFeedback
   return [...latest.values()];
 }
 
+/** Mean (rounded) of the given numeric field across counters that supplied it, else null. */
+function meanOfCounters(
+  feedbacks: ReviewerFeedback[],
+  field: "suggestedRate" | "suggestedCommitment"
+): number | null {
+  const values = feedbacks
+    .filter((f) => f.decision === "counter" && f[field] !== null)
+    .map((f) => f[field] as number);
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+}
+
 function aggregationSig(feedbacks: ReviewerFeedback[]): string {
   const canonical = feedbacks
     .map(
       (f) =>
-        `${f.reviewerId}|${f.decision}|${f.suggestedRate ?? ""}|${f.qualitativeFeedback}|${f.submittedAt}`
+        `${f.reviewerId}|${f.decision}|${f.suggestedRate ?? ""}|${f.suggestedCommitment ?? ""}|${f.qualitativeFeedback}|${f.submittedAt}`
     )
     .sort()
     .join("\n");

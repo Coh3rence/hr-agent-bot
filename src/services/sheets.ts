@@ -244,10 +244,14 @@ export class SheetsService {
    */
   async getCandidateOffer(
     id: string
-  ): Promise<{ suggestedRate: number | null; qualitativeSummary: string } | null> {
+  ): Promise<{
+    suggestedRate: number | null;
+    suggestedCommitment: number | null;
+    qualitativeSummary: string;
+  } | null> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "Agreements!A2:N",
+      range: "Agreements!A2:Q",
     });
 
     const row = (res.data.values || []).find((r) => r[0] === id);
@@ -259,7 +263,14 @@ export class SheetsService {
     const rateRaw = row[12];
     const rate = rateRaw === "" || rateRaw == null ? null : Number(rateRaw);
     const suggestedRate = rate == null || Number.isNaN(rate) ? null : rate;
-    return { suggestedRate, qualitativeSummary };
+
+    const commitmentRaw = row[16];
+    const commitment =
+      commitmentRaw === "" || commitmentRaw == null ? null : Number(commitmentRaw);
+    const suggestedCommitment =
+      commitment == null || Number.isNaN(commitment) ? null : commitment;
+
+    return { suggestedRate, suggestedCommitment, qualitativeSummary };
   }
 
   /**
@@ -326,7 +337,8 @@ export class SheetsService {
   async updateAgreementAggregation(
     id: string,
     aggregatedRate: number | null,
-    aggregatedSummary: string
+    aggregatedSummary: string,
+    aggregatedCommitment: number | null = null
   ): Promise<boolean> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
@@ -338,11 +350,23 @@ export class SheetsService {
     if (index === -1) return false;
 
     const rowNum = index + 2;
-    await this.sheets.spreadsheets.values.update({
+    // M/N are contiguous; aggregated commitment lives in Q (O/P are already
+    // candidateNotifiedAt/betaAppAgreementId), so it's a separate write.
+    await this.sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: this.spreadsheetId,
-      range: `Agreements!M${rowNum}:N${rowNum}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[aggregatedRate ?? "", aggregatedSummary]] },
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data: [
+          {
+            range: `Agreements!M${rowNum}:N${rowNum}`,
+            values: [[aggregatedRate ?? "", aggregatedSummary]],
+          },
+          {
+            range: `Agreements!Q${rowNum}`,
+            values: [[aggregatedCommitment ?? ""]],
+          },
+        ],
+      },
     });
     return true;
   }
@@ -413,7 +437,7 @@ export class SheetsService {
   ): Promise<void> {
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: "ReviewFeedback!A:G",
+      range: "ReviewFeedback!A:H",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [
@@ -425,6 +449,7 @@ export class SheetsService {
             feedback.suggestedRate ?? "",
             feedback.qualitativeFeedback,
             feedback.submittedAt,
+            feedback.suggestedCommitment ?? "",
           ],
         ],
       },
@@ -434,7 +459,7 @@ export class SheetsService {
   async getReviewFeedbacks(agreementId: string): Promise<ReviewerFeedback[]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: "ReviewFeedback!A2:G",
+      range: "ReviewFeedback!A2:H",
     });
 
     return (res.data.values || [])
@@ -446,6 +471,8 @@ export class SheetsService {
         suggestedRate: r[4] ? Number(r[4]) : null,
         qualitativeFeedback: r[5] || "",
         submittedAt: r[6] || "",
+        // Column H, appended after submittedAt so pre-widen rows read as null.
+        suggestedCommitment: r[7] ? Number(r[7]) : null,
       }));
   }
 

@@ -50,10 +50,14 @@ export async function presentToCandidate(
     offer.suggestedRate != null
       ? `Proposed rate: $${offer.suggestedRate}/hr`
       : `The reviewers did not propose a rate.`;
+  const commitmentLine =
+    offer.suggestedCommitment != null
+      ? `\nProposed commitment: ${offer.suggestedCommitment}%`
+      : ``;
   const message =
     `Your proposal has been reviewed.\n\n` +
     `Role: ${agreement.roleName}\n` +
-    `${rateLine}\n\n` +
+    `${rateLine}${commitmentLine}\n\n` +
     `${offer.qualitativeSummary}\n\n` +
     `How would you like to proceed?`;
 
