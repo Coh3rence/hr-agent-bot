@@ -81,9 +81,10 @@ export interface ParsedCounter {
  *   - Rate = a LEADING bare number (the prompt asks the reviewer to "start with
  *     the number"). A number followed by a digit or % is not a rate, so
  *     "we need a commitment of 50%" is never misread as $50/hr.
- *   - Commitment = a number immediately followed by % anywhere in the message,
- *     e.g. "bump commitment to 50%". Leading bare number (rate) and number+%
- *     (commitment) don't collide, so we scan the original text for the percent.
+ *   - Commitment = a number adjacent to % anywhere in the message, on either
+ *     side ("50%" or "%40"), e.g. "bump commitment to 50%". Leading bare number
+ *     (rate) and number-with-% (commitment) don't collide, so we scan the
+ *     original text for the percent.
  *   - Everything left over rides through as qualitative feedback.
  */
 export function parseCounterFeedback(text: string): ParsedCounter {
@@ -97,9 +98,10 @@ export function parseCounterFeedback(text: string): ParsedCounter {
     qualitative = text.slice(rateMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
   }
 
-  const commitmentMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+  // Accept the percent on either side of the number: "50%", "50 %", "%40", "% 40".
+  const commitmentMatch = text.match(/(\d+(?:\.\d+)?)\s*%|%\s*(\d+(?:\.\d+)?)/);
   if (commitmentMatch) {
-    suggestedCommitment = Number(commitmentMatch[1]);
+    suggestedCommitment = Number(commitmentMatch[1] ?? commitmentMatch[2]);
   }
 
   if (!qualitative) qualitative = "(no qualitative feedback provided)";

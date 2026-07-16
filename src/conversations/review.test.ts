@@ -35,6 +35,23 @@ describe("parseCounterFeedback", () => {
     expect(r.suggestedRate).toBeNull();
     expect(r.suggestedCommitment).toBe(50);
   });
+
+  test("percent before the number is still commitment (%40)", () => {
+    const r = parseCounterFeedback("commitment should be %40");
+    expect(r.suggestedRate).toBeNull();
+    expect(r.suggestedCommitment).toBe(40);
+  });
+
+  test("percent before the number with a space (% 40)", () => {
+    const r = parseCounterFeedback("commitment should be % 40");
+    expect(r.suggestedCommitment).toBe(40);
+  });
+
+  test("rate + percent-before-number commitment", () => {
+    const r = parseCounterFeedback("60, commitment %40 - fine otherwise");
+    expect(r.suggestedRate).toBe(60);
+    expect(r.suggestedCommitment).toBe(40);
+  });
 });
 
 // ClaudeService's constructor makes no network call, and these aggregation
