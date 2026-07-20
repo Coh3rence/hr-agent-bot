@@ -6,6 +6,11 @@
  * (the roles you apply to) or AuthorizedUsers (who can log in) — those are the
  * fixtures a test run reads from, not the data it produces.
  *
+ * NOTE: this only clears the Google Sheet. The backend (Collabberry fork) DB is
+ * a SEPARATE store — leftover Collabberry users there will squat on the
+ * email/wallet/handle a fresh signup tries to reuse. To reset the backend too,
+ * also run scripts/reset-backend-test-data.sh --org <BETA_APP_ORG_ID> --admin-wallet <SERVICE_ADMIN_WALLET>.
+ *
  * Usage:
  *   bun scripts/reset-test-data.ts --sheet-id <id>   # target a specific sheet (dev)
  *   bun scripts/reset-test-data.ts                    # uses GOOGLE_SHEETS_ID from .env
