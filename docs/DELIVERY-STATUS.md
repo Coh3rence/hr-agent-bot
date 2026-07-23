@@ -64,11 +64,11 @@ bot, and the self-review hatch. None of that is production.
 ### Production Readiness Checklist
 
 **Hard blockers (before any real contributor):**
-1. **Invite-token consumption** — the primary ordering bug is **fixed + committed** on the fork
-   (`85b17ce`: email/wallet checks now run before token consume). Residual hardening remains:
-   consume + user-create aren't in one transaction, and the consume is a non-atomic
-   read-modify-write, so a double-submit/concurrent signup can still burn a single-use token or
-   surface an uncaught 500 (address+email are DB-unique). See Known Issues #7.
+1. **Invite-token consumption** — **RESOLVED (2026-07-23), pushed to `Coh3rence/backend`.** The
+   ordering bug (`85b17ce`) and atomicity (`f522639`) are both fixed: consume + user-create now run
+   in one transaction with an atomic conditional UPDATE, closing double-spend, token-burn-on-failure,
+   and the uncaught-500 race (duplicate-entry → clean 400). Verified end-to-end via a fresh-contributor
+   signup and at the SQL level. See Known Issues #7.
 2. **Decide + stand up the production backend + DB.** Currently local docker + mysql; the D-018
    token-persistence schema change lives only on the fork; the prod deploy target is **undecided**.
    This is the critical-path decision — env, secrets, sheet, and frontend URL all resolve once it's set.

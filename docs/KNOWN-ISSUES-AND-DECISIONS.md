@@ -47,27 +47,35 @@
 
 ## Open Issues (Production Blockers & Hardening)
 
-### 7. Invite-token consumption robustness (backend fork) — PARTIALLY FIXED
-- **Original bug (FIXED, committed `85b17ce`):** the single-use invite token was consumed
+### 7. Invite-token consumption robustness (backend fork) — RESOLVED (2026-07-23)
+- **Original ordering bug (FIXED, committed `85b17ce`):** the single-use invite token was consumed
   (`usageCount++`, `isActive=false`) *before* the email-uniqueness check, so a duplicate-email
   signup burned the token with no user created and the retry dead-ended with a misleading
-  "Invalid or expired invitation token." Email + wallet checks now run **before** consume
-  (`user.service.ts` `registerUser`, lines ~48-60 before ~62-92).
-- **Residual (open) — atomicity:**
-  - Token consume (findOne → `usageCount++` → save, ~line 89) and user-create (`save(user)`,
-    ~line 106) are **not in one DB transaction**. `address` and `email` are DB-unique
-    (`user.model.ts:10,13`), so a concurrent/duplicate submit can pass the service-level checks,
-    consume the token, then throw an **uncaught unique-constraint 500** at `save(user)` — token
-    burned, no rollback.
-  - The consume itself is a non-atomic read-modify-write, so two concurrent redemptions of a
-    `usageLimit:1` token can both read `usageCount=0` and **double-spend** it.
-- **Fix options:** (a) wrap consume + user-create in a transaction so a save failure rolls back
-  the increment; (b) make consume an atomic conditional `UPDATE … SET usageCount=usageCount+1
-  WHERE token=? AND usageCount<usageLimit` and check affected rows; (c) catch the unique-constraint
-  violation → return a clean 400 instead of a 500.
-- Contributing cause (test hygiene, separate): `scripts/reset-test-data.ts` wipes the Sheet but
-  not the backend DB, so stale users squat on the unique email/wallet. Extend the reset to also
-  clear the org's users/agreements/invites, and use a fresh email + wallet per run.
+  "Invalid or expired invitation token." Email + wallet checks now run **before** consume.
+- **Atomicity (FIXED, committed `f522639`, pushed to `Coh3rence/backend`):** consume + user-create
+  now run in ONE `AppDataSource.transaction` with an atomic conditional UPDATE
+  (`SET usageCount = usageCount + 1, isActive = CASE WHEN usageCount >= usageLimit THEN false ELSE
+  isActive END WHERE token = ? AND isActive = true AND usageCount < usageLimit`, then assert
+  `affected === 1`). This closes all three residuals at once:
+  - **Double-spend:** two concurrent redemptions of a `usageLimit:1` token can no longer both win —
+    exactly one affects a row; the loser gets a clean 400.
+  - **Token-burn-on-failure:** a failed `save(user)` (e.g. a racing unique address/email hit) rolls
+    back the increment inside the transaction, so the link stays usable.
+  - **Uncaught 500:** a duplicate-entry violation that slips past the pre-checks is mapped to a
+    clean **400** (`isDuplicateEntryError`) instead of surfacing as a 500.
+- **MySQL gotcha baked into the fix:** MySQL evaluates SET assignments left-to-right and later
+  expressions see the *already-updated* column, so the deactivation guard is `usageCount >= usageLimit`
+  (NOT `usageCount + 1 >= …`). Using `+ 1` deactivated a multi-use token one redemption early and
+  locked out its last user — caught during retest.
+- **Verified end-to-end 2026-07-23:** fresh-contributor loop through the real bot + browser signup;
+  token minted → consumed exactly once (`isActive=0, usageCount=1`) → user + agreement created.
+  Also validated at the SQL level (single-use blocks the 2nd redemption; multi-use stays active
+  until the true limit).
+- **Contributing cause (test hygiene) — FIXED:** `scripts/reset-test-data.ts` gained `--with-backend`
+  to clear the Sheet AND the backend org's users/agreements/invitations in one shot, so stale users
+  no longer squat on the unique email/wallet. Follow-up: `--with-backend` currently requires
+  `NODE_ENV=development` (for the right sheet) and `SERVICE_ADMIN_WALLET` in the env — the plain
+  one-shot invocation still needs that wiring.
 
 ### 8. Finalization depends on a manual "I've signed up" tap — HARDENING
 - After the contributor accepts, the bot issues an invite and waits for the contributor to tap
