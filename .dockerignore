@@ -1,0 +1,23 @@
+node_modules
+dist
+out
+coverage
+*.log
+
+# Never ship env / credential files into the image — Railway injects them.
+.env
+.env.*
+*-credentials.json
+*service-account*.json
+*.json.key
+scripts/setup-env.sh
+
+.git
+.gitignore
+.idea
+.DS_Store
+
+# Local working logs
+ITERATIONS.md
+DECISIONS.md
+BACKLOG.md
