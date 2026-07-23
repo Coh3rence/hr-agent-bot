@@ -36,6 +36,25 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
   ctx.session.selectedOpportunityId = agreement.opportunityId;
 
   if (action === "accept") {
+    // "Accept" means accept the reviewers' COUNTER, not the contributor's original
+    // ask. Reconcile the agreement's terms to the aggregated suggestion before we
+    // bridge to Collabberry, otherwise the backend agreement would be created with
+    // the pre-review rate/commitment. Fall back to the current values when a
+    // counter dimension was left blank (reviewers only countered one of them).
+    const offer = await ctx.sheets.getCandidateOffer(agreementId);
+    if (offer) {
+      const reconciledRate = offer.suggestedRate ?? agreement.hourlyRate;
+      const reconciledCommitment = offer.suggestedCommitment ?? agreement.commitmentPercent;
+      if (
+        reconciledRate !== agreement.hourlyRate ||
+        reconciledCommitment !== agreement.commitmentPercent
+      ) {
+        await ctx.sheets.updateAgreementTerms(agreementId, reconciledRate, reconciledCommitment);
+        agreement.hourlyRate = reconciledRate;
+        agreement.commitmentPercent = reconciledCommitment;
+      }
+    }
+
     await ctx.sheets.updateAgreementStatus(agreementId, "approved");
 
     const contributor = await ctx.sheets.getContributorById(agreement.contributorId);

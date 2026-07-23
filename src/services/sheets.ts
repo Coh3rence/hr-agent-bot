@@ -334,6 +334,35 @@ export class SheetsService {
     return true;
   }
 
+  /**
+   * Overwrite the agreed terms (F=hourlyRate, G=commitmentPercent) when the
+   * candidate accepts a reviewer counter-offer, so the record — and the bridge
+   * that reads it — reflect the terms actually agreed, not the original proposal.
+   */
+  async updateAgreementTerms(
+    id: string,
+    hourlyRate: number,
+    commitmentPercent: number
+  ): Promise<boolean> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:A",
+    });
+
+    const rows = res.data.values || [];
+    const index = rows.findIndex((r) => r[0] === id);
+    if (index === -1) return false;
+
+    const rowNum = index + 2;
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `Agreements!F${rowNum}:G${rowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[hourlyRate, commitmentPercent]] },
+    });
+    return true;
+  }
+
   async updateAgreementAggregation(
     id: string,
     aggregatedRate: number | null,
