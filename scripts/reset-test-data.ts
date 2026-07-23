@@ -6,19 +6,23 @@
  * (the roles you apply to) or AuthorizedUsers (who can log in) — those are the
  * fixtures a test run reads from, not the data it produces.
  *
- * NOTE: this only clears the Google Sheet. The backend (Collabberry fork) DB is
- * a SEPARATE store — leftover Collabberry users there will squat on the
- * email/wallet/handle a fresh signup tries to reuse. To reset the backend too,
- * also run scripts/reset-backend-test-data.sh --org <BETA_APP_ORG_ID> --admin-wallet <SERVICE_ADMIN_WALLET>.
+ * NOTE: the Sheet and the backend (Collabberry fork) DB are SEPARATE stores. If
+ * only one is cleared they drift, and leftover Collabberry users squat on the
+ * email/wallet/handle a fresh signup tries to reuse. Pass --with-backend to reset
+ * BOTH in one shot (calls reset-backend-test-data.sh with BETA_APP_ORG_ID +
+ * SERVICE_ADMIN_WALLET from the env), so you can't forget one.
  *
  * Usage:
- *   bun scripts/reset-test-data.ts --sheet-id <id>   # target a specific sheet (dev)
- *   bun scripts/reset-test-data.ts                    # uses GOOGLE_SHEETS_ID from .env
+ *   bun scripts/reset-test-data.ts                    # sheet only, GOOGLE_SHEETS_ID from .env
+ *   bun scripts/reset-test-data.ts --sheet-id <id>    # sheet only, target a specific sheet (dev)
+ *   bun scripts/reset-test-data.ts --with-backend     # sheet + backend DB (no drift)
  */
 import { google } from "googleapis";
 import { loadEnv } from "./_env";
 
 const env = loadEnv();
+
+const withBackend = process.argv.includes("--with-backend");
 
 const idIdx = process.argv.indexOf("--sheet-id");
 const spreadsheetId = idIdx >= 0 ? process.argv[idIdx + 1] : env.GOOGLE_SHEETS_ID;
@@ -56,4 +60,29 @@ for (const tab of TABS_TO_CLEAR) {
   console.log(`${tab}: cleared ${rowCount} data row(s) (header kept)`);
 }
 
-console.log("\nDone. Tabs are clean and ready for a fresh test run.");
+if (withBackend) {
+  const orgId = env.BETA_APP_ORG_ID;
+  const adminWallet = env.SERVICE_ADMIN_WALLET;
+  if (!orgId || !adminWallet) {
+    console.error(
+      "\n--with-backend needs BETA_APP_ORG_ID and SERVICE_ADMIN_WALLET in the env " +
+        "(base .env / .env.<NODE_ENV>). Sheet was cleared; backend was NOT."
+    );
+    process.exit(1);
+  }
+
+  const script = `${import.meta.dir}/reset-backend-test-data.sh`;
+  console.log(`\nClearing backend DB for org ${orgId} (preserving admin ${adminWallet})...`);
+  const proc = Bun.spawnSync([script, "--org", orgId, "--admin-wallet", adminWallet], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if (proc.exitCode !== 0) {
+    console.error("Backend reset failed (see output above). Sheet was cleared; backend may be partial.");
+    process.exit(proc.exitCode ?? 1);
+  }
+}
+
+console.log(
+  `\nDone. ${withBackend ? "Sheet + backend DB are" : "Tabs are"} clean and ready for a fresh test run.`
+);

@@ -48,6 +48,55 @@
 
 ---
 
+## End-to-End Status & Production Readiness (2026-07-23)
+
+The full loop is **proven end-to-end in a test environment**: discovery → semantic match →
+negotiation → submit → reviewer counter → resolution/accept → bot-minted invite → browser
+signup (SIWE) → `resolveByToken` link → `createBetaAgreement` → agreement renders in the
+Collabberry Team view on the Arbitrum One mainnet org. Verified with a fresh contributor
+(status=hired, real wallet + collabberryUserId). All M2/M3 flow items above are functionally
+complete despite the "Remaining" labels, which predate this run.
+
+**Caveat:** this ran in test mode — `dev:stage` (`NODE_ENV=development`), local backend +
+mysql (docker :3000), local frontend (`yarn start`, inline mainnet env), the dev Telegram
+bot, and the self-review hatch. None of that is production.
+
+### Production Readiness Checklist
+
+**Hard blockers (before any real contributor):**
+1. **Invite-token consumption** — the primary ordering bug is **fixed + committed** on the fork
+   (`85b17ce`: email/wallet checks now run before token consume). Residual hardening remains:
+   consume + user-create aren't in one transaction, and the consume is a non-atomic
+   read-modify-write, so a double-submit/concurrent signup can still burn a single-use token or
+   surface an uncaught 500 (address+email are DB-unique). See Known Issues #7.
+2. **Decide + stand up the production backend + DB.** Currently local docker + mysql; the D-018
+   token-persistence schema change lives only on the fork; the prod deploy target is **undecided**.
+   This is the critical-path decision — env, secrets, sheet, and frontend URL all resolve once it's set.
+3. **Run the bot in production mode** — `NODE_ENV=production`, real prod `.env` (prod Telegram bot
+   token, not the dev bot; Anthropic key; Google service account; backend service key), on a hosted
+   long-running process with restart (Railway per Tech Stack), not `bun --watch` locally.
+4. **Restore the client reviewer `302836662`** in `AuthorizedUsers` (removed for solo testing) and
+   validate real quorum with human reviewers — prod has no self-review shortcut
+   (`selfReviewAllowed()` requires both `NODE_ENV=development` **and** `ALLOW_SELF_REVIEW=true`, so
+   it is already prod-safe).
+
+**Infra / hosting:**
+5. **Frontend deploy** — hosted build with managed `VITE_*` prod env (currently inline, uncommitted);
+   the `useAuth` invite-redirect fix lives on `Coh3rence/frontend`.
+6. **Google Sheet** — confirm prod uses the intended sheet (dev is `1gI4rf8…`) + service-account access.
+7. **Secrets management** — keys must not live in laptop `.env` files in prod.
+
+**Hardening (not strictly blocking):**
+8. **Manual "I've signed up" hinge** — finalization depends entirely on that tap; add polling /
+   auto-detect via `resolveByToken`. See Known Issues #8.
+9. **Bot logging / observability** — zero per-message logging today. See Known Issues #9.
+10. **On-chain TP minting** — a manual admin signature (TP balance still 0%); document as an operator
+    step, out of bot scope.
+
+**Critical path = #2** (where the production backend lives).
+
+---
+
 ## Key Design Decisions (Locked In)
 
 | Decision | Detail |
