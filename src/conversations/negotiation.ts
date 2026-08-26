@@ -34,13 +34,19 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
   if (!telegramId) return;
 
   const oppId = ctx.session.selectedOpportunityId;
-  if (!oppId) return;
+  if (!oppId) {
+    await ctx.reply("I've lost track of which role we were discussing. Send /start and I'll bring your matches back up.");
+    return;
+  }
 
   // First message after selecting opportunity
   if (!ctx.session.currentAgreementId && !ctx.message?.text) {
     const opportunities = await ctx.sheets.getOpenOpportunities();
     const opp = opportunities.find((o) => o.id === oppId);
-    if (!opp) return;
+    if (!opp) {
+      await ctx.reply("That role is no longer open, sorry. Send /start to see what else is available.");
+      return;
+    }
 
     await ctx.reply(
       `You've selected **${opp.title}**.\n\nNow let's discuss the terms. Please propose:\n\n1. Your hourly rate (budget range is not disclosed)\n2. Your commitment % (e.g., 50% = ~20hrs/week)\n3. Preferred duration (in months)\n\nYou can share these all at once or we can discuss each one.`,
@@ -74,10 +80,17 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
   if (extracted?.isComplete && extracted.hourlyRate) {
     const opportunities = await ctx.sheets.getOpenOpportunities();
     const opp = opportunities.find((o) => o.id === oppId);
-    if (!opp) return;
+    if (!opp) {
+      await ctx.reply("That role was closed while we were talking, sorry. Send /start to see what else is open.");
+      return;
+    }
 
     const contributor = await ctx.sheets.getContributor(telegramId);
-    if (!contributor) return;
+    if (!contributor) {
+      console.error(`handleNegotiation: contributor not found for telegramId ${telegramId}`);
+      await ctx.reply("I couldn't find your profile. Send /start and we'll set it up again.");
+      return;
+    }
 
     // Calculate settlement likelihood
     const skillScore =
@@ -110,7 +123,7 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       status: "draft",
       reviewerFeedback: [],
       aggregatedCounterOffer: null,
-      negotiationRound: 1,
+      negotiationRound: ctx.session.negotiationRound,
       submittedAt: new Date().toISOString(),
       reviewedAt: null,
       betaAppAgreementId: null,

@@ -21,11 +21,15 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
   const parts = data.split(":");
   const action = parts[1] ?? "";
   const agreementId = parts[2] || ctx.session.currentAgreementId;
-  if (!agreementId) return;
+  if (!agreementId) {
+    await ctx.reply("That button's from an older conversation I no longer have context for. Send /start to pick things up again.");
+    return;
+  }
 
   const agreement = await ctx.sheets.getAgreement(agreementId);
   if (!agreement) {
     console.error(`handleResolution: agreement ${agreementId} not found`);
+    await ctx.reply("I couldn't find that agreement — it may have been removed. The admin has been notified.");
     return;
   }
 
@@ -111,7 +115,11 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     // the org roster by the invite token they redeemed, capture the verified
     // wallet + userId, then create the agreement (D-018).
     const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
-    if (!contributor) return;
+    if (!contributor) {
+      console.error(`handleResolution linked: contributor ${agreement.contributorId} not found`);
+      await ctx.reply("I couldn't find your profile to link. The admin has been notified and will follow up.");
+      return;
+    }
 
     try {
       const match = await ctx.beta.resolveByToken(contributor.collabberryInviteToken);
@@ -148,10 +156,29 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
       );
     }
   } else if (action === "modify") {
+    // The round count is authoritative on the persisted row, not the session: the
+    // candidate may tap Modify hours later on a cold session that has lost it.
+    if (agreement.negotiationRound >= ctx.config.MAX_NEGOTIATION_ROUNDS) {
+      await ctx.reply(
+        `We've reached the limit of ${ctx.config.MAX_NEGOTIATION_ROUNDS} negotiation rounds for this role. ` +
+          "You can accept the reviewers' offer as it stands, or step away — no hard feelings either way.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "Accept offer", callback_data: `resolution:accept:${agreementId}` }],
+              [{ text: "Walk away", callback_data: `resolution:walkaway:${agreementId}` }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
     // Re-enter negotiation. Clear currentAgreementId so a fresh draft is created
     // when the new terms complete. The prior offer + counter + reviewer reasons
     // ride in negotiationContext (D-012) as system-prompt background, keeping
     // messageHistory a clean user-first transcript.
+    ctx.session.negotiationRound = agreement.negotiationRound + 1;
     ctx.session.currentAgreementId = null;
     ctx.session.phase = "negotiation";
     ctx.session.messageHistory = [];
@@ -251,4 +278,5 @@ function resetSession(ctx: BotContext): void {
   ctx.session.selectedOpportunityId = null;
   ctx.session.messageHistory = [];
   ctx.session.negotiationContext = null;
+  ctx.session.negotiationRound = 1;
 }

@@ -1,5 +1,5 @@
 import { Bot, session, Context, type SessionFlavor } from "grammy";
-import { loadConfig } from "./config";
+import { loadConfig, type Env } from "./config";
 import type { SessionData, ConversationPhase } from "./models/types";
 import { handleGate } from "./conversations/gate";
 import { handleDiscovery } from "./conversations/discovery";
@@ -23,6 +23,7 @@ export type BotContext = Context &
     sheets: SheetsService;
     claude: ClaudeService;
     beta: BetaAppService;
+    config: Env;
   };
 
 const config = loadConfig();
@@ -39,6 +40,7 @@ bot.use((ctx, next) => {
   ctx.sheets = sheets;
   ctx.claude = claude;
   ctx.beta = beta;
+  ctx.config = config;
   return next();
 });
 
@@ -54,6 +56,7 @@ bot.use(
       pendingReviewAgreementId: null,
       pendingReviewDecision: null,
       negotiationContext: null,
+      negotiationRound: 1,
     }),
   })
 );
@@ -123,6 +126,7 @@ bot.on("callback_query:data", async (ctx) => {
   } else if (data.startsWith("select_opp:")) {
     ctx.session.selectedOpportunityId = data.replace("select_opp:", "");
     ctx.session.phase = "negotiation";
+    ctx.session.negotiationRound = 1;
     await ctx.answerCallbackQuery();
     await handleNegotiation(ctx);
   } else if (data.startsWith("review:")) {

@@ -107,4 +107,5 @@ export interface SessionData {
   pendingReviewAgreementId: string | null;
   pendingReviewDecision: "counter" | "reject" | null;
   negotiationContext: string | null;
+  negotiationRound: number;
 }
