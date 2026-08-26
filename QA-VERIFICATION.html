@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collabberry HR Agent — QA Verification</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1d21; line-height: 1.55; max-width: 1000px;
+    margin: 0 auto; padding: 40px 32px; font-size: 14px;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 18px; margin: 34px 0 12px; padding-bottom: 6px;
+    border-bottom: 2px solid #e3e6ea; page-break-after: avoid;
+  }
+  h3 { font-size: 15px; margin: 24px 0 8px; color: #33383d; page-break-after: avoid; }
+  p { margin: 10px 0; }
+  table {
+    border-collapse: collapse; width: 100%; margin: 14px 0;
+    font-size: 12.5px; page-break-inside: avoid;
+  }
+  th {
+    background: #f4f6f8; text-align: left; font-weight: 600;
+    border: 1px solid #d7dbe0; padding: 7px 9px;
+  }
+  td { border: 1px solid #d7dbe0; padding: 7px 9px; vertical-align: top; }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  code {
+    background: #f0f2f4; padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+  }
+  blockquote {
+    margin: 14px 0; padding: 10px 16px; background: #fbf7ec;
+    border-left: 3px solid #d9a441; color: #4a4335;
+  }
+  blockquote p { margin: 0; }
+  ol, ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  a { color: #1a5fb4; }
+  hr { border: 0; border-top: 1px solid #e3e6ea; margin: 26px 0; }
+  strong { font-weight: 600; }
+  .doc-footer {
+    margin-top: 40px; padding-top: 12px; border-top: 1px solid #e3e6ea;
+    font-size: 11px; color: #7a8189;
+  }
+  @media print { body { padding: 0; max-width: none; } a { color: #1a1d21; } }
+</style>
+</head>
+<body>
+<h1>Collabberry HR Agent — QA Verification Document</h1>
+<p><strong>Environment:</strong> Production<br>
+<strong>Date of this run:</strong> ______________<br>
+<strong>Tester:</strong> ______________<br>
+<strong>Client witness:</strong> ______________</p>
+<h2>1. Systems under test</h2>
+<p>Health verified 2026-08-26 14:14 UTC via <code>railway run --service bot bun scripts/health-check.ts</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>URL / Handle</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Telegram bot</td>
+<td><a href="https://t.me/Coh3erence_hr_bot">@Coh3erence_hr_bot</a> (id <code>8811416846</code>)</td>
+<td>PASS — process running, polling Telegram</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td><a href="https://collabberry-frontend.vercel.app">https://collabberry-frontend.vercel.app</a></td>
+<td>PASS — 200</td>
+</tr>
+<tr>
+<td>Member signup route</td>
+<td><a href="https://collabberry-frontend.vercel.app/member-sign-up">https://collabberry-frontend.vercel.app/member-sign-up</a></td>
+<td>PASS — 200</td>
+</tr>
+<tr>
+<td>Backend API</td>
+<td><a href="https://backend-production-53b74.up.railway.app">https://backend-production-53b74.up.railway.app</a></td>
+<td>PASS — <code>POST /api/users/auth/nonce</code> → 200</td>
+</tr>
+<tr>
+<td>Org roster endpoint</td>
+<td><code>GET /api/orgs/{orgId}</code></td>
+<td>PASS — returns org &quot;Aleksa&quot;</td>
+</tr>
+<tr>
+<td>Data store</td>
+<td>Google Sheet <code>1qM9_Ppm…</code></td>
+<td>PASS — read OK</td>
+</tr>
+<tr>
+<td>Language model (Claude)</td>
+<td><code>api.anthropic.com</code></td>
+<td>PASS — 200</td>
+</tr>
+</tbody></table>
+<p><strong>Target organisation:</strong> &quot;Aleksa&quot;, id <code>63e3ac6c-3e63-4eec-9ac0-de607adf7d05</code>
+<strong>Chain:</strong> Arbitrum One (42161) — TeamPoints contract <code>0x635af529462Fe31cb92C639237207eD7cbAF084e</code></p>
+<blockquote>
+<p>Note: the backend root URL returns 404 by design — there is no root route. Health is confirmed via the API endpoints above, not the bare domain.</p>
+</blockquote>
+<blockquote>
+<p><strong>Before you start — both reviewers must have opened the bot.</strong> Telegram will not deliver a message to anyone who has never started a chat with the bot. The reviewer pool is <code>535329585</code> and <code>302836662</code>, and quorum is 2 of 2, so if either reviewer has not pressed Start at <a href="https://t.me/Coh3erence_hr_bot">https://t.me/Coh3erence_hr_bot</a>, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.</p>
+</blockquote>
+<h2>2. How to use this document</h2>
+<p>Each test has a <strong>fixed expected result</strong> agreed in advance. Walk them in order — later tests depend on state created by earlier ones. Record the outcome in the Result column as PASS / FAIL / N-A and put anything surprising in Notes. A FAIL is not necessarily a defect; note it and continue so the session isn&#39;t blocked.</p>
+<h2>3. Configured business rules (verified in code, 2026-08-21)</h2>
+<p>These are the rules the tests below assert against. All are environment-overridable without a code change.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Configured value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Reviewer response window</td>
+<td>48 hours</td>
+<td><code>REVIEWER_TIMEOUT_HOURS</code></td>
+</tr>
+<tr>
+<td>Max negotiation rounds</td>
+<td>2 — enforced</td>
+<td><code>MAX_NEGOTIATION_ROUNDS</code></td>
+</tr>
+<tr>
+<td>Cooldown after rejection</td>
+<td>3 days</td>
+<td><code>COOLDOWN_DAYS</code></td>
+</tr>
+<tr>
+<td>Reviewer quorum</td>
+<td>Majority — <code>floor(n/2)+1</code></td>
+<td><code>services/quorum.ts</code></td>
+</tr>
+<tr>
+<td>Hourly → monthly conversion</td>
+<td>× 160 h/month (40h × 4wk)</td>
+<td><code>FTE_HOURS_PER_MONTH</code></td>
+</tr>
+<tr>
+<td>Fiat portion of comp</td>
+<td>0 — remainder in TeamPoints</td>
+<td><code>DEFAULT_FIAT_REQUESTED</code></td>
+</tr>
+<tr>
+<td>Contributor statuses</td>
+<td><code>active</code>, <code>hired</code>, <code>rejected</code>, <code>cooldown</code></td>
+<td><code>models/types.ts</code></td>
+</tr>
+</tbody></table>
+<h2>4. Test cases</h2>
+<h3>A — Access control</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A1</td>
+<td>Bot responds</td>
+<td>Send <code>/start</code> to @Coh3erence_hr_bot</td>
+<td>Bot replies; conversation begins</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>Unauthorised user is gated</td>
+<td><code>/start</code> from an account not in AuthorizedUsers</td>
+<td>Access is refused, no opportunity data leaks</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>A3</td>
+<td>Admin authorisation</td>
+<td>Admin runs <code>/authorize</code> for a new Telegram id</td>
+<td>User is added and can now proceed</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>B — Admin opportunity management</h3>
+<p>Confirms the admin never edits the spreadsheet directly — all changes go through the bot.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B1</td>
+<td>List opportunities</td>
+<td><code>/list_opportunities</code></td>
+<td>Current roles returned with budget and status</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>B2</td>
+<td>Create opportunity</td>
+<td><code>/add_opportunity</code>, follow prompts</td>
+<td>New role appears in B1 and in the sheet</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>B3</td>
+<td>Edit opportunity</td>
+<td><code>/edit_opportunity</code></td>
+<td>Change persists and is reflected in B1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>B4</td>
+<td>Pause opportunity</td>
+<td><code>/pause_opportunity</code></td>
+<td>Role stops being offered to new contributors</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>C — Contributor discovery and matching</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>Natural-language intake</td>
+<td>Describe skills conversationally, not as a form</td>
+<td>Bot extracts skills, rate range, availability, timezone without rigid prompts</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Structured capture</td>
+<td>Check the Contributors sheet row</td>
+<td>Skills, commitment %, rate min/max, timezone, location all populated correctly</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>C3</td>
+<td>Role match</td>
+<td>Continue to matching</td>
+<td>Bot proposes a relevant role with a match score</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>Poor-fit handling</td>
+<td>Offer skills unrelated to any open role</td>
+<td>Bot declines gracefully rather than forcing a bad match</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>D — Negotiation</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td>Counter-offer</td>
+<td>Propose a rate above budget</td>
+<td>Bot negotiates; settlement likelihood reflects distance from budget</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>D2</td>
+<td>Round cap</td>
+<td>Tap &quot;Modify Terms&quot; after a second review</td>
+<td>Revision limit reached; only Accept / Walk away are offered — no third round</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>D3</td>
+<td>Submission</td>
+<td>Accept terms</td>
+<td>Agreement row created with status submitted; reviewers notified</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>E — Review and quorum</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>E1</td>
+<td>Reviewer notification</td>
+<td>Check reviewer account</td>
+<td>Reviewer receives the proposal with approve / counter options</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E2</td>
+<td>Approve path</td>
+<td>Reviewer approves</td>
+<td>Decision recorded in ReviewFeedback</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E3</td>
+<td>Counter path</td>
+<td>Reviewer counters with a different rate</td>
+<td>Suggested rate parsed and stored</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E4</td>
+<td>Majority quorum</td>
+<td>With a pool of n reviewers</td>
+<td>Review closes at <code>floor(n/2)+1</code> responses, not unanimity</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E5</td>
+<td>Late responder</td>
+<td>Reviewer responds after quorum</td>
+<td>Late response ignored, outcome unchanged</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E6</td>
+<td>48h escalation</td>
+<td>Leave a review unanswered past the window</td>
+<td>Sweep escalates the agreement (runs every 15 min)</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>F — Resolution</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F1</td>
+<td>Aggregation</td>
+<td>Multiple reviewers give differing rates</td>
+<td>Feedback aggregated into a single coherent counter-offer</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F2</td>
+<td>Reconciliation</td>
+<td>Reviewer counter changes the rate</td>
+<td>Final agreement terms match the reviewer&#39;s counter, not the original ask</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Candidate accepts</td>
+<td>Accept the resolved offer</td>
+<td>Agreement status → approved</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F4</td>
+<td>Candidate rejects</td>
+<td>Decline the offer</td>
+<td>Contributor enters 3-day cooldown</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>G — Collabberry integration (the critical path)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test</th>
+<th>Steps</th>
+<th>Expected result</th>
+<th>Result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G1</td>
+<td>Invite issued</td>
+<td>On acceptance</td>
+<td>Bot sends a signup link to <code>/member-sign-up?invitationToken=…</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G2</td>
+<td>Signup completes</td>
+<td>Open link, connect a <strong>fresh</strong> wallet, sign up</td>
+<td>Account created in Collabberry</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G3</td>
+<td>Confirmation tap</td>
+<td>Return to Telegram, tap &quot;I&#39;ve signed up&quot;</td>
+<td>Bot links the wallet and creates the on-chain agreement</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G4</td>
+<td>Sheet updated</td>
+<td>Check Contributors row</td>
+<td>status <code>hired</code>, walletAddress and collabberryUserId populated</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G5</td>
+<td>Agreement recorded</td>
+<td>Check Agreements row</td>
+<td><code>betaAppAgreementId</code> populated</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G6</td>
+<td>Renders in app</td>
+<td>Open frontend Team view as org admin</td>
+<td>Contributor and agreement visible with correct rate and commitment</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G7</td>
+<td>Rate conversion</td>
+<td>Compare hourly ask to agreement marketRate</td>
+<td>marketRate = hourly × 160</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>G8</td>
+<td>Single-use invite</td>
+<td>Attempt to reuse a consumed invite token</td>
+<td>Second redemption refused cleanly</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>5. Known limitations — disclose before testing</h2>
+<p>These are understood behaviours, not defects discovered during the session. Raising them up front avoids them being logged as surprises.</p>
+<ol>
+<li><strong>The &quot;I&#39;ve signed up&quot; tap is manual.</strong> Nothing polls for signup completion. The contributor must return to Telegram and tap the button after finishing in the browser. Tapping <em>before</em> signup completes silently does nothing — the contributor stays in <code>active</code>. This is the most common point of confusion in a live demo.</li>
+<li><strong>Each full end-to-end run needs a fresh wallet.</strong> The backend rejects a second agreement for a wallet that already has one. Re-running G with a previously used wallet will fail by design.</li>
+<li><strong>TeamPoints balance shows 0 after hiring.</strong> Minting is a separate manual admin action on-chain and is outside the bot&#39;s scope.</li>
+<li><strong>The bot has no per-message logging.</strong> State is verified by reading the Google Sheet and backend, not by reading logs.</li>
+<li><strong>Data store is a Google Sheet.</strong> Intentional for the MVP so the client can inspect state directly.</li>
+</ol>
+<h2>6. Pre-go-live items — not blockers for this session</h2>
+<p>Configuration that is deliberately relaxed for testing and must be tightened before real contributors are onboarded.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Current state</th>
+<th>Required before go-live</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NODE_ENV</code></td>
+<td><code>development</code> on the deployed bot</td>
+<td><code>production</code></td>
+</tr>
+<tr>
+<td><code>ALLOW_SELF_REVIEW</code></td>
+<td><code>true</code> — one account can approve its own proposal</td>
+<td><code>false</code> / removed</td>
+</tr>
+<tr>
+<td>Reviewer pool</td>
+<td>Two admins (quorum of 2) — one has not yet opened the bot</td>
+<td>Both reviewers reachable; wider pool as the team grows</td>
+</tr>
+<tr>
+<td>Test data</td>
+<td>Sheet holds prior test records</td>
+<td>Reset before real use</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Because the first two are currently enabled, the entire loop <strong>can be demonstrated from a single Telegram account</strong> today. That is a testing convenience only and must be switched off before production use.</p>
+</blockquote>
+<h2>7. Outcome</h2>
+<p><strong>Tests passed:</strong> ____ / 32
+<strong>Failures / follow-ups:</strong></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Severity</th>
+<th>Owner</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Client sign-off:</strong> ______________  <strong>Date:</strong> ______________</p>
+
+<div class="doc-footer">
+  Collabberry HR Agent — QA Verification. Generated 2026-08-26.
+</div>
+</body>
+</html>
