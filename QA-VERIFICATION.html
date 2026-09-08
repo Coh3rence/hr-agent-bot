@@ -57,7 +57,7 @@
 <strong>Tester:</strong> ______________<br>
 <strong>Client witness:</strong> ______________</p>
 <h2>1. Systems under test</h2>
-<p>Health verified 2026-08-26 14:14 UTC via <code>railway run --service bot bun scripts/health-check.ts</code>.</p>
+<p>Health verified 2026-09-07 09:23 UTC via <code>railway run --service bot bun scripts/health-check.ts</code> — all six checks PASS.</p>
 <table>
 <thead>
 <tr>
@@ -107,8 +107,35 @@
 <blockquote>
 <p>Note: the backend root URL returns 404 by design — there is no root route. Health is confirmed via the API endpoints above, not the bare domain.</p>
 </blockquote>
+<p><strong>Participants for this run</strong></p>
+<table>
+<thead>
+<tr>
+<th>Telegram id</th>
+<th>Plays</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>535329585</code> (Aleksa)</td>
+<td>Candidate + org admin</td>
+<td>Runs the section B admin commands before applying; the code excludes a contributor from their own reviewer pool, so he cannot review his own proposal</td>
+</tr>
+<tr>
+<td><code>1971913512</code> (Simon, @qbfrank)</td>
+<td>Reviewer</td>
+<td>First half of quorum</td>
+</tr>
+<tr>
+<td><code>302836662</code> (Gustavo, @sepu85)</td>
+<td>Reviewer (client)</td>
+<td>Second half of quorum</td>
+</tr>
+</tbody></table>
+<p>Reviewer pool is therefore <code>1971913512</code> and <code>302836662</code>, quorum 2 of 2.</p>
 <blockquote>
-<p><strong>Before you start — both reviewers must have opened the bot.</strong> Telegram will not deliver a message to anyone who has never started a chat with the bot. The reviewer pool is <code>535329585</code> and <code>302836662</code>, and quorum is 2 of 2, so if either reviewer has not pressed Start at <a href="https://t.me/Coh3erence_hr_bot">https://t.me/Coh3erence_hr_bot</a>, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.</p>
+<p><strong>Before you start — both reviewers must have opened the bot.</strong> Telegram will not deliver a message to anyone who has never started a chat with the bot, and the failure is silent rather than an error. If either reviewer has not pressed Start at <a href="https://t.me/Coh3erence_hr_bot">https://t.me/Coh3erence_hr_bot</a>, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.</p>
+<p>If one reviewer cannot participate live, run <code>bun scripts/remove-admin.ts --id &lt;their id&gt;</code> to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. Note this makes E4 and E5 not observable — see the note under section E.</p>
 </blockquote>
 <h2>2. How to use this document</h2>
 <p>Each test has a <strong>fixed expected result</strong> agreed in advance. Walk them in order — later tests depend on state created by earlier ones. Record the outcome in the Result column as PASS / FAIL / N-A and put anything surprising in Notes. A FAIL is not necessarily a defect; note it and continue so the session isn&#39;t blocked.</p>
@@ -385,6 +412,9 @@
 <td></td>
 </tr>
 </tbody></table>
+<blockquote>
+<p><strong>On E4 and E5.</strong> With a two-reviewer pool, <code>floor(2/2)+1 = 2</code>, so majority and unanimity coincide and there is no third reviewer left to respond late — neither case is observable in a live run at this pool size. Both are instead evidenced deterministically by the unit tests in <code>src/services/quorum.test.ts</code>, which assert the threshold across pool sizes 1–5 (a pool of 3 closing at 2, and of 5 at 3), that a late responder does not change an already-satisfied outcome, and that out-of-pool and repeat votes are not double-counted. Run with <code>bun test</code>.</p>
+</blockquote>
 <h3>F — Resolution</h3>
 <table>
 <thead>
@@ -514,6 +544,7 @@
 <li><strong>Each full end-to-end run needs a fresh wallet.</strong> The backend rejects a second agreement for a wallet that already has one. Re-running G with a previously used wallet will fail by design.</li>
 <li><strong>TeamPoints balance shows 0 after hiring.</strong> Minting is a separate manual admin action on-chain and is outside the bot&#39;s scope.</li>
 <li><strong>The bot has no per-message logging.</strong> State is verified by reading the Google Sheet and backend, not by reading logs.</li>
+<li><strong>A bot restart loses the conversation in progress.</strong> Conversation state is held in memory, so a redeploy or crash makes the bot forget what it has already collected and ask for it again. Anything already written to the sheet is safe. Do not redeploy during a session.</li>
 <li><strong>Data store is a Google Sheet.</strong> Intentional for the MVP so the client can inspect state directly.</li>
 </ol>
 <h2>6. Pre-go-live items — not blockers for this session</h2>
@@ -522,33 +553,33 @@
 <thead>
 <tr>
 <th>Item</th>
-<th>Current state</th>
+<th>State for this session</th>
 <th>Required before go-live</th>
 </tr>
 </thead>
 <tbody><tr>
 <td><code>NODE_ENV</code></td>
-<td><code>development</code> on the deployed bot</td>
 <td><code>production</code></td>
+<td>Already done</td>
 </tr>
 <tr>
 <td><code>ALLOW_SELF_REVIEW</code></td>
-<td><code>true</code> — one account can approve its own proposal</td>
-<td><code>false</code> / removed</td>
+<td><code>false</code> — self-approval is structurally impossible</td>
+<td>Already done</td>
 </tr>
 <tr>
 <td>Reviewer pool</td>
-<td>Two admins (quorum of 2) — one has not yet opened the bot</td>
-<td>Both reviewers reachable; wider pool as the team grows</td>
+<td>Two admins (quorum of 2), both reachable</td>
+<td>Wider pool as the team grows</td>
 </tr>
 <tr>
 <td>Test data</td>
-<td>Sheet holds prior test records</td>
-<td>Reset before real use</td>
+<td>Cleared 2026-09-07 — sheet holds no prior records</td>
+<td>Already done</td>
 </tr>
 </tbody></table>
 <blockquote>
-<p>Because the first two are currently enabled, the entire loop <strong>can be demonstrated from a single Telegram account</strong> today. That is a testing convenience only and must be switched off before production use.</p>
+<p>The self-review escape hatch that previously allowed the whole loop to be driven from one Telegram account has been switched off for this session. Every decision below is made by a distinct participant: the candidate cannot approve their own agreement.</p>
 </blockquote>
 <h2>7. Outcome</h2>
 <p><strong>Tests passed:</strong> ____ / 32
@@ -574,7 +605,7 @@
 <p><strong>Client sign-off:</strong> ______________  <strong>Date:</strong> ______________</p>
 
 <div class="doc-footer">
-  Collabberry HR Agent — QA Verification. Generated 2026-08-26.
+  Collabberry HR Agent — QA Verification. Generated 2026-09-08.
 </div>
 </body>
 </html>

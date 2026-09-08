@@ -52,6 +52,45 @@ describe("parseCounterFeedback", () => {
     expect(r.suggestedRate).toBe(60);
     expect(r.suggestedCommitment).toBe(40);
   });
+
+  // DEF-11: a reviewer wrote prose ending in "$40?" during the 2026-09-08 QA run.
+  // The rate was dropped, so the contributor was shown $40 while the agreement
+  // still held the original $50 ask.
+  test("DEF-11: dollar amount mid-sentence is the rate", () => {
+    const r = parseCounterFeedback("It's above our budget for this role, can we reduce it to $40?");
+    expect(r.suggestedRate).toBe(40);
+    expect(r.suggestedCommitment).toBeNull();
+    expect(r.qualitative).toBe("It's above our budget for this role, can we reduce it to $40?");
+  });
+
+  test("DEF-11: when the current rate is quoted first, the last dollar amount wins", () => {
+    const r = parseCounterFeedback("$50/hr is over budget, let's land at $40");
+    expect(r.suggestedRate).toBe(40);
+  });
+
+  test("DEF-11: a leading number still beats a later dollar amount", () => {
+    const r = parseCounterFeedback("38 - their last ask was $50 which we can't fund");
+    expect(r.suggestedRate).toBe(38);
+    expect(r.qualitative).toBe("their last ask was $50 which we can't fund");
+  });
+
+  test("DEF-11: a lone leading amount is the rate and drops out of the prose", () => {
+    const r = parseCounterFeedback("$60 - too expensive otherwise");
+    expect(r.suggestedRate).toBe(60);
+    expect(r.qualitative).toBe("too expensive otherwise");
+  });
+
+  test("DEF-11: a dollar amount does not hijack a percentage", () => {
+    const r = parseCounterFeedback("keep the rate, but commitment must be 50%");
+    expect(r.suggestedRate).toBeNull();
+    expect(r.suggestedCommitment).toBe(50);
+  });
+
+  test("DEF-11: prose with no number at all yields nothing to record", () => {
+    const r = parseCounterFeedback("this feels too expensive for the role");
+    expect(r.suggestedRate).toBeNull();
+    expect(r.suggestedCommitment).toBeNull();
+  });
 });
 
 // ClaudeService's constructor makes no network call, and these aggregation

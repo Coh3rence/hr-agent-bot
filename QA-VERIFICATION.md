@@ -7,7 +7,7 @@
 
 ## 1. Systems under test
 
-Health verified 2026-08-26 14:14 UTC via `railway run --service bot bun scripts/health-check.ts`.
+Health verified 2026-09-07 09:23 UTC via `railway run --service bot bun scripts/health-check.ts` — all six checks PASS.
 
 | Component | URL / Handle | Status |
 |---|---|---|
@@ -24,7 +24,19 @@ Health verified 2026-08-26 14:14 UTC via `railway run --service bot bun scripts/
 
 > Note: the backend root URL returns 404 by design — there is no root route. Health is confirmed via the API endpoints above, not the bare domain.
 
-> **Before you start — both reviewers must have opened the bot.** Telegram will not deliver a message to anyone who has never started a chat with the bot. The reviewer pool is `535329585` and `302836662`, and quorum is 2 of 2, so if either reviewer has not pressed Start at https://t.me/Coh3erence_hr_bot, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.
+**Participants for this run**
+
+| Telegram id | Plays | Notes |
+|---|---|---|
+| `535329585` (Aleksa) | Candidate + org admin | Runs the section B admin commands before applying; the code excludes a contributor from their own reviewer pool, so he cannot review his own proposal |
+| `1971913512` (Simon, @qbfrank) | Reviewer | First half of quorum |
+| `302836662` (Gustavo, @sepu85) | Reviewer (client) | Second half of quorum |
+
+Reviewer pool is therefore `1971913512` and `302836662`, quorum 2 of 2.
+
+> **Before you start — both reviewers must have opened the bot.** Telegram will not deliver a message to anyone who has never started a chat with the bot, and the failure is silent rather than an error. If either reviewer has not pressed Start at https://t.me/Coh3erence_hr_bot, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.
+>
+> If one reviewer cannot participate live, run `bun scripts/remove-admin.ts --id <their id>` to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. Note this makes E4 and E5 not observable — see the note under section E.
 
 ## 2. How to use this document
 
@@ -93,6 +105,8 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 | E5 | Late responder | Reviewer responds after quorum | Late response ignored, outcome unchanged | | |
 | E6 | 48h escalation | Leave a review unanswered past the window | Sweep escalates the agreement (runs every 15 min) | | |
 
+> **On E4 and E5.** With a two-reviewer pool, `floor(2/2)+1 = 2`, so majority and unanimity coincide and there is no third reviewer left to respond late — neither case is observable in a live run at this pool size. Both are instead evidenced deterministically by the unit tests in `src/services/quorum.test.ts`, which assert the threshold across pool sizes 1–5 (a pool of 3 closing at 2, and of 5 at 3), that a late responder does not change an already-satisfied outcome, and that out-of-pool and repeat votes are not double-counted. Run with `bun test`.
+
 ### F — Resolution
 
 | ID | Test | Steps | Expected result | Result | Notes |
@@ -123,20 +137,21 @@ These are understood behaviours, not defects discovered during the session. Rais
 2. **Each full end-to-end run needs a fresh wallet.** The backend rejects a second agreement for a wallet that already has one. Re-running G with a previously used wallet will fail by design.
 3. **TeamPoints balance shows 0 after hiring.** Minting is a separate manual admin action on-chain and is outside the bot's scope.
 4. **The bot has no per-message logging.** State is verified by reading the Google Sheet and backend, not by reading logs.
-5. **Data store is a Google Sheet.** Intentional for the MVP so the client can inspect state directly.
+5. **A bot restart loses the conversation in progress.** Conversation state is held in memory, so a redeploy or crash makes the bot forget what it has already collected and ask for it again. Anything already written to the sheet is safe. Do not redeploy during a session.
+6. **Data store is a Google Sheet.** Intentional for the MVP so the client can inspect state directly.
 
 ## 6. Pre-go-live items — not blockers for this session
 
 Configuration that is deliberately relaxed for testing and must be tightened before real contributors are onboarded.
 
-| Item | Current state | Required before go-live |
+| Item | State for this session | Required before go-live |
 |---|---|---|
-| `NODE_ENV` | `development` on the deployed bot | `production` |
-| `ALLOW_SELF_REVIEW` | `true` — one account can approve its own proposal | `false` / removed |
-| Reviewer pool | Two admins (quorum of 2) — one has not yet opened the bot | Both reviewers reachable; wider pool as the team grows |
-| Test data | Sheet holds prior test records | Reset before real use |
+| `NODE_ENV` | `production` | Already done |
+| `ALLOW_SELF_REVIEW` | `false` — self-approval is structurally impossible | Already done |
+| Reviewer pool | Two admins (quorum of 2), both reachable | Wider pool as the team grows |
+| Test data | Cleared 2026-09-07 — sheet holds no prior records | Already done |
 
-> Because the first two are currently enabled, the entire loop **can be demonstrated from a single Telegram account** today. That is a testing convenience only and must be switched off before production use.
+> The self-review escape hatch that previously allowed the whole loop to be driven from one Telegram account has been switched off for this session. Every decision below is made by a distinct participant: the candidate cannot approve their own agreement.
 
 ## 7. Outcome
 

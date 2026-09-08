@@ -91,3 +91,43 @@
   DB and Google Sheet. This made end-to-end diagnosis blind during testing.
 - **Fix idea:** add structured logging around phase transitions and Beta App calls
   (submit, review decision, resolve, createAgreement) for production support/observability.
+
+### 10. Conversation state is in-memory only — lost on every restart — HARDENING
+- `src/bot.ts` installs grammy's `session()` with no storage adapter, so all conversation state
+  (phase, message history, in-flight agreement/review ids) lives in process memory.
+- Any restart — deploy, crash, or the Telegram 409 `getUpdates` conflict / Railway restart cycle —
+  wipes every in-flight conversation. Discovery then re-asks for details it had already collected,
+  and a reviewer mid-`reviewer_feedback` loses the pending decision.
+- Observed live 2026-09-07 during the client QA session: a tester asked "why does it ask for the
+  same info 10x" after the bot restarted several times behind a 409.
+- **Operational workaround:** never `railway up` mid-session; confirm the log tail has no recent 409
+  before a witnessed run.
+- **Fix idea:** back `session()` with a persistent adapter (a Sheet tab, Redis, or the existing
+  MySQL) keyed on Telegram id, so state survives restarts.
+
+### 11. Reviewer counter rate is only parsed from a LEADING number — FIXED IN CODE, AWAITING DEPLOY
+- `parseCounterFeedback` (`src/conversations/review.ts`) matches the rate with `/^\s*\$?(\d+...)/`,
+  so it is captured only when the reviewer's message *begins* with the number. The prompt does ask
+  the reviewer to "start with the number", but reviewers write naturally.
+- **Observed live 2026-09-08 during the client QA session** on agreement `a_1788808260898`:
+  the reviewer sent "It's above our budget for this role, can we reduce it to $40?".
+  `suggestedRate` was stored as empty, and the confirmation degraded to the rate-less
+  "Counter-offer recorded." rather than "Counter-offer recorded at $40/hr."
+- **Downstream consequence (the damaging part):** aggregation had no numeric counter to average,
+  so Agreements column M was left blank while Claude's synthesized prose in column N *does* quote
+  "$40". The contributor is shown an offer that reads $40. On accept,
+  `reconciledRate = offer.suggestedRate ?? agreement.hourlyRate` (`resolution.ts`) falls back to the
+  **original $50 ask**, so the agreement is created at a rate the contributor never agreed to.
+  Prose and stored terms silently disagree.
+- **Fix (in `src/conversations/review.ts`, covered by `review.test.ts`):**
+  1. `parseCounterFeedback` now falls back to the LAST currency-anchored amount anywhere in the
+     message. A leading *bare* number still wins outright (the documented convention), but a
+     leading *amount* no longer does — "$50/hr is over budget, land at $40" resolves to 40, since
+     the first amount is usually the rate being argued against.
+  2. `collectReviewerFeedback` refuses a counter carrying neither a rate nor a commitment. It asks
+     the reviewer to restate with a number and keeps the pending decision so they can simply
+     resend, rather than recording an unusable counter.
+  3. The counter prompt now tells reviewers a dollar sign works anywhere in the sentence.
+- **Live remediation:** the affected agreement's column M was corrected to `40` by hand so the run
+  could continue; the reviewer's original blank-rate row is deliberately left in ReviewFeedback as
+  evidence.

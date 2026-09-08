@@ -3,7 +3,7 @@
 **Project:** HR AI Agent MVP for Collabberry
 **Client:** [Coh3rence](https://github.com/Coh3rence/) / [Collabberry](https://github.com/collabberry/)
 **Developer:** Prosperity Labs
-**Status as of:** 2026-08-26
+**Status as of:** 2026-08-27
 
 ---
 
@@ -13,13 +13,9 @@ All three milestones are **functionally complete** and the entire loop has been 
 
 Production is **healthy — all six service checks pass** as of 2026-08-26 14:14 UTC. The Anthropic key outage that blocked conversation on 2026-08-22/23 is resolved.
 
-Three configuration items remain before real contributors are onboarded:
+The production sheet was **reset to a clean state on 2026-08-26** and both reviewer accounts are authorised and reachable, so the QA session can run against real data.
 
-1. The client's reviewer account (`302836662`) is authorised but **has never opened a DM with the bot**, so Telegram will not deliver reviewer notifications to them. Because quorum is now 2 of 2, every review will hang until the 48h escalation until they press Start at https://t.me/Coh3erence_hr_bot.
-2. The bot runs with **development flags in production**, which leaves the self-review bypass active.
-3. The production sheet still holds **test records** (`test_contributor_123`).
-
-None of these are code defects. All three are deployment or configuration items.
+Both outstanding configuration items were closed on 2026-09-07: the bot now runs `NODE_ENV=production` with `ALLOW_SELF_REVIEW=false`, so self-approval is structurally impossible and every decision must come from a distinct participant.
 
 ---
 
@@ -34,7 +30,7 @@ None of these are code defects. All three are deployment or configuration items.
 | Bot data store | Google Sheet `1qM9_Ppm…` | PASS |
 | Language model | Claude Sonnet via `api.anthropic.com` | PASS |
 
-**Reviewer pool:** `535329585` (Prosperity Labs, reachable) and `302836662` (client, **not yet reachable** — awaiting their first Start). Quorum is `floor(2/2)+1 = 2`, so both must respond for a review to close.
+**Authorised accounts:** `535329585` (Prosperity Labs), `302836662` (client) and `1971913512` — all admins, all verified reachable. The reviewer pool for any given proposal is these accounts minus the contributor, so quorum is `floor(2/2)+1 = 2` when one of them applies.
 
 **Target org:** "Aleksa", `63e3ac6c-3e63-4eec-9ac0-de607adf7d05` on Arbitrum One (42161).
 TeamPoints contract `0x635af529462Fe31cb92C639237207eD7cbAF084e`.
@@ -97,13 +93,12 @@ Evidence in the production sheet:
 
 | # | Item | Current state | Required |
 |---|---|---|---|
-| 1 | **Anthropic API key** | 401, invalid | Set a valid `ANTHROPIC_API_KEY` on the Railway bot service and redeploy. Blocks all conversation. |
-| 2 | **`NODE_ENV`** | `development` | `production` |
-| 3 | **`ALLOW_SELF_REVIEW`** | `true` | `false` or removed. With #2 this is what keeps the self-review bypass live. |
-| 4 | **Reviewer pool** | `535329585` (admin) plus a `test_contributor_123` placeholder | Authorise the real reviewers, remove the placeholder, then run one genuine multi-reviewer loop |
-| 5 | **Test data** | Prod sheet holds the 2026-07-31 test contributor and agreement | `bun scripts/reset-test-data.ts` (no `NODE_ENV` prefix — that targets the dev sheet) |
+| 1 | **`NODE_ENV`** | `development` | `production` |
+| 2 | **`ALLOW_SELF_REVIEW`** | `true` | `false` or removed. With #1 this is what keeps the self-review bypass available. |
 
-Items 2 and 3 are a single `railway variables` call plus a redeploy. Item 1 needs a valid key from the client or from Prosperity Labs.
+Both are a single `railway variables` call plus a redeploy, and are deliberately left as-is until the QA session passes.
+
+Resolved since the last revision: the Anthropic API key (valid, verified), the reviewer pool (`535329585` and `302836662`, both authorised and reachable, placeholder removed), and the test data (sheet cleared 2026-08-26, backup retained).
 
 > Note: an earlier version of this document claimed self-review was "already prod-safe" because it requires both `NODE_ENV=development` and `ALLOW_SELF_REVIEW=true`. Both are currently set on the deployed bot, so the bypass **is active in production**. That claim was wrong and is corrected here.
 

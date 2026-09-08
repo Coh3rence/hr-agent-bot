@@ -51,7 +51,7 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     await ctx.reply(
       "Please send your counter-offer in a single message. You can suggest a new " +
         "rate, a new commitment %, or both — plus your feedback:\n\n" +
-        "• Rate — start with the number (e.g. `60`)\n" +
+        "• Rate — start with the number (e.g. `60`), or write it with a dollar sign anywhere (e.g. `$60`)\n" +
         "• Commitment — write it as a percentage (e.g. `50%`)\n\n" +
         "Example: `60, commitment should be 50% - experience is thin for senior level`",
       { parse_mode: "Markdown" }
@@ -78,9 +78,13 @@ export interface ParsedCounter {
 /**
  * Parse a reviewer's free-text counter-offer into structured levers + prose.
  * Pure (no I/O) so it can be unit-tested without the Telegram flow.
- *   - Rate = a LEADING bare number (the prompt asks the reviewer to "start with
- *     the number"). A number followed by a digit or % is not a rate, so
- *     "we need a commitment of 50%" is never misread as $50/hr.
+ *   - Rate, in precedence order: a LEADING bare number (the prompt asks the
+ *     reviewer to "start with the number"), otherwise the LAST currency-anchored
+ *     amount anywhere in the message. Reviewers write prose despite the prompt,
+ *     and a leading amount is often the rate being argued against rather than the
+ *     target ("$50/hr is over budget, land at $40"), so the last one wins there.
+ *     A number followed by a digit or % is not a rate, so "we need a commitment
+ *     of 50%" is never misread as $50/hr.
  *   - Commitment = a number adjacent to % anywhere in the message, on either
  *     side ("50%" or "%40"), e.g. "bump commitment to 50%". Leading bare number
  *     (rate) and number-with-% (commitment) don't collide, so we scan the
@@ -92,10 +96,22 @@ export function parseCounterFeedback(text: string): ParsedCounter {
   let suggestedCommitment: number | null = null;
   let qualitative = text.trim();
 
-  const rateMatch = text.match(/^\s*\$?(\d+(?:\.\d+)?)(?![\d%])/);
-  if (rateMatch) {
-    suggestedRate = Number(rateMatch[1]);
-    qualitative = text.slice(rateMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
+  const leadingMatch = text.match(/^\s*\$?(\d+(?:\.\d+)?)(?![\d%])/);
+  const startsWithAmount = /^\s*\$/.test(text);
+  const dollarAmounts = [...text.matchAll(/\$\s*(\d+(?:\.\d+)?)(?![\d%])/g)];
+  const lastAmount = dollarAmounts.at(-1);
+
+  if (leadingMatch && !startsWithAmount) {
+    suggestedRate = Number(leadingMatch[1]);
+    qualitative = text.slice(leadingMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
+  } else if (lastAmount) {
+    suggestedRate = Number(lastAmount[1]);
+    // Only strip the amount out of the prose when it led the message and was the
+    // only one; mid-sentence amounts are part of a sentence that stops making
+    // sense with a hole in it.
+    if (startsWithAmount && dollarAmounts.length === 1) {
+      qualitative = text.slice(leadingMatch![0].length).replace(/^[\s\-:,.]+/, "").trim();
+    }
   }
 
   // Accept the percent on either side of the number: "50%", "50 %", "%40", "% 40".
@@ -126,6 +142,21 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
     suggestedRate = parsed.suggestedRate;
     suggestedCommitment = parsed.suggestedCommitment;
     qualitative = parsed.qualitative;
+
+    // A counter with no number is unusable: aggregation has nothing to average,
+    // so the contributor is shown prose quoting a rate the agreement never
+    // stores, and accepting silently reinstates the original ask. Ask again
+    // instead of recording it.
+    if (suggestedRate === null && suggestedCommitment === null) {
+      await ctx.reply(
+        "I couldn't find a number in that. Please resend with the rate written as a " +
+          "number — either at the start (`40`) or with a dollar sign anywhere (`$40`) — " +
+          "and keep your reasoning in the same message.\n\n" +
+          "To change commitment instead, write it as a percentage (`50%`).",
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
   }
 
   const ok = await recordReviewerDecision(
