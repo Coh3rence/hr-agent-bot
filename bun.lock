@@ -6,6 +6,7 @@
       "name": "hr-agent-bot",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.78.0",
+        "@grammyjs/storage-file": "^2.6.0",
         "googleapis": "^171.4.0",
         "grammy": "^1.41.1",
         "zod": "^4.3.6",
@@ -22,6 +23,8 @@
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.78.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-PzQhR715td/m1UaaN5hHXjYB8Gl2lF9UVhrrGrZeysiF6Rb74Wc9GCB8hzLdzmQtBd1qe89F9OptgB9Za1Ib5w=="],
 
     "@babel/runtime": ["@babel/runtime@7.28.6", "", {}, "sha512-05WQkdpL9COIMz4LjTxGpPNCdlpyimKppYNoJ5Di5EUObifl8t4tuLuUBBZEpoLYOmfvIWrsp9fCl0HoPRVTdA=="],
+
+    "@grammyjs/storage-file": ["@grammyjs/storage-file@2.6.0", "", {}, "sha512-6kThtQt2JUJOGYQ2iddvkK40WpaEZFxMMXyM9kXM/Adwaf5PxtxVAnNjb5h+Ue16zUQ+zYAy1253wpsupgVbJQ=="],
 
     "@grammyjs/types": ["@grammyjs/types@3.25.0", "", {}, "sha512-iN9i5p+8ZOu9OMxWNcguojQfz4K/PDyMPOnL7PPCON+SoA/F8OKMH3uR7CVUkYfdNe0GCz8QOzAWrnqusQYFOg=="],
 

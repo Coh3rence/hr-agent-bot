@@ -1,4 +1,6 @@
 import { Bot, session, Context, type SessionFlavor } from "grammy";
+import { FileAdapter } from "@grammyjs/storage-file";
+import { mkdirSync } from "fs";
 import { loadConfig, type Env } from "./config";
 import type { SessionData, ConversationPhase } from "./models/types";
 import { handleGate } from "./conversations/gate";
@@ -10,6 +12,7 @@ import { SheetsService } from "./services/sheets";
 import { ClaudeService } from "./services/claude";
 import { BetaAppService } from "./services/betaApp";
 import { sweepExpiredReviews, SWEEP_INTERVAL_MS } from "./services/timeout";
+import { sweepExpiredSessions } from "./services/sessionStore";
 import {
   handleAddOpportunity,
   handleListOpportunities,
@@ -44,7 +47,11 @@ bot.use((ctx, next) => {
   return next();
 });
 
-// Session middleware
+// Session middleware. Persisted to disk rather than held in memory: a restart —
+// deploy, crash, or the Telegram 409 conflict Railway resolves by restarting —
+// used to wipe every conversation, so discovery re-asked questions it had already
+// answered and an in-flight negotiation silently reset its round counter.
+mkdirSync(config.SESSION_DIR, { recursive: true });
 bot.use(
   session({
     initial: (): SessionData => ({
@@ -58,6 +65,7 @@ bot.use(
       negotiationContext: null,
       negotiationRound: 1,
     }),
+    storage: new FileAdapter<SessionData>({ dirName: config.SESSION_DIR }),
   })
 );
 
@@ -150,12 +158,21 @@ function startReviewTimeoutSweep() {
   setInterval(() => void sweepExpiredReviews(sheets, claude, bot.api), SWEEP_INTERVAL_MS);
 }
 
+// Reuses the review sweep's cadence — persisted sessions need an expiry and this
+// scheduler already exists.
+function startSessionSweep() {
+  sweepExpiredSessions(config.SESSION_DIR);
+  setInterval(() => sweepExpiredSessions(config.SESSION_DIR), SWEEP_INTERVAL_MS);
+}
+
 // Start
 async function main() {
   await sheets.initialize();
   console.log("Google Sheets connected");
   startReviewTimeoutSweep();
   console.log(`Review timeout sweep scheduled every ${SWEEP_INTERVAL_MS / 60000} min`);
+  startSessionSweep();
+  console.log(`Sessions persisted to ${config.SESSION_DIR}`);
   console.log("Starting HR Agent Bot...");
   bot.start();
 }

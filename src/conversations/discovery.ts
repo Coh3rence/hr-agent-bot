@@ -38,6 +38,17 @@ interface ExtractedProfile {
   isComplete: boolean;
 }
 
+/**
+ * Keep only the most recent `limit` turns. Sessions are persisted to disk and the
+ * whole history is re-sent to Claude on every turn, so an unbounded array is both
+ * an unbounded file and an unbounded prompt. Trimming on write means the stored
+ * copy is the bounded one.
+ */
+export function trimHistory<T>(history: T[], limit: number): T[] {
+  if (limit <= 0 || history.length <= limit) return history;
+  return history.slice(history.length - limit);
+}
+
 export async function handleDiscovery(ctx: BotContext): Promise<void> {
   const text = ctx.message?.text;
   if (!text) return;
@@ -47,6 +58,10 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
 
   // Add to conversation history
   ctx.session.messageHistory.push({ role: "user", content: text });
+  ctx.session.messageHistory = trimHistory(
+    ctx.session.messageHistory,
+    ctx.config.SESSION_HISTORY_LIMIT
+  );
 
   // Try to extract profile data
   const conversationText = ctx.session.messageHistory
@@ -167,7 +182,10 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
   } else {
     // Continue conversation to collect missing info
     const response = await ctx.claude.chat(DISCOVERY_SYSTEM_PROMPT, ctx.session.messageHistory);
-    ctx.session.messageHistory.push({ role: "assistant", content: response });
+    ctx.session.messageHistory = trimHistory(
+      [...ctx.session.messageHistory, { role: "assistant" as const, content: response }],
+      ctx.config.SESSION_HISTORY_LIMIT
+    );
     await ctx.reply(response);
   }
 }

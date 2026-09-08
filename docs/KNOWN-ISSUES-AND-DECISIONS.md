@@ -131,3 +131,43 @@
 - **Live remediation:** the affected agreement's column M was corrected to `40` by hand so the run
   could continue; the reviewer's original blank-rate row is deliberately left in ReviewFeedback as
   evidence.
+
+### 12. Session storage is file-backed and single-instance — DESIGN DECISION
+- Fixing DEF-10 requires a durable session store. Redis is the textbook choice, but it means a new
+  service, new credentials and new operational surface for a bot that runs at `numReplicas=1`.
+- **Decision: use grammy's `FileAdapter` on a mounted Railway volume, accepting single-instance as
+  a deliberate constraint rather than an oversight.** The bot has run at one replica since launch
+  and nothing in the roadmap requires more.
+- **The constraint, stated plainly:** a file-backed store is only safe while exactly one instance
+  runs. Two replicas would write the same files concurrently and corrupt sessions. Scaling the
+  `bot` service past one replica is therefore **not** a configuration change — it requires swapping
+  the adapter first.
+- **The swap, when it is needed:** `@grammyjs/storage-redis` exposes the same interface, so it is a
+  one-line change to the `storage` option plus a Redis service. No session code changes. Triggers
+  are (a) needing more than one replica, or (b) sustained message volume where per-message file
+  I/O measurably lags.
+- Recorded here so the tradeoff is a documented choice with a known exit, not a landmine for
+  whoever next opens the Railway dashboard and scales the service.
+
+### 13. Capacity ceiling is the Google Sheet, not the bot — CAPACITY NOTE
+- **Estimated from code inspection, not from a load test.** Treat the figures as an order of
+  magnitude and measure before committing to them with a client.
+- Each inbound message costs **2–4 Sheets API calls**. `handleGate` alone reads `isAuthorized`,
+  then `getAdminIds` for an unauthorised user, then `getContributor`, then `getOpenOpportunities`;
+  `handleDiscovery` adds a contributor read plus a write, and re-reads the open roles on completion.
+- Google's published quota is **60 reads and 60 writes per minute per user**, and the bot
+  authenticates as a single service account — so the per-user quota is the whole bot's budget. The
+  300/minute per-project ceiling is never the binding one.
+- That gives roughly **15–30 messages per minute in total**, or **10–15 people in active
+  conversation simultaneously**. Registered-but-idle users cost nothing, so roster size is
+  effectively unbounded; only concurrent chatter counts.
+- **The failure mode is abrupt, not graceful.** Over quota, Sheets returns 429 and the calls throw.
+  There is no retry, backoff or queue, so the bot fails mid-conversation rather than slowing down.
+- **Cheapest headroom is caching, not new infrastructure.** `isAuthorized` and `getAdminIds` run on
+  nearly every message and change maybe weekly. A short in-memory TTL cache (~60s) on those two
+  would cut sheet traffic by more than half and roughly double the ceiling. Do this before
+  considering a database.
+- **When the Sheet has to go:** sustained bursts — fifty applicants in an afternoon — exceed what
+  caching can absorb. That is a store migration, materially larger than the session-persistence
+  change in `FIX-PLAN-DEF10-SESSION-PERSISTENCE.md`, and out of MVP scope. The Sheet is deliberate
+  for the MVP so the client can inspect state directly (QA document §5).

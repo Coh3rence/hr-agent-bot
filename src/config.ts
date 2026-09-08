@@ -27,6 +27,16 @@ const envSchema = z.object({
   FTE_HOURS_PER_MONTH: z.coerce.number().default(160),
   // Fiat slice of monthly comp; remainder paid in TeamPoints. Default 0 = all TeamPoints.
   DEFAULT_FIAT_REQUESTED: z.coerce.number().default(0),
+  // Where conversation sessions are persisted. Defaults to a local directory so
+  // `bun run dev` works with no setup. In production this MUST be set to a path on
+  // a mounted Railway volume (`/data/sessions`) — anywhere else on the container
+  // filesystem is discarded with the container, leaving sessions no more durable
+  // than memory. The resolved path is logged on boot so a misconfiguration is
+  // visible rather than silent.
+  SESSION_DIR: z.string().default(".sessions"),
+  // Turns kept in a session's message history. Bounds both the on-disk session
+  // and the transcript re-sent to Claude on every discovery turn.
+  SESSION_HISTORY_LIMIT: z.coerce.number().default(20),
   REVIEWER_TIMEOUT_HOURS: z.coerce.number().default(48),
   MAX_NEGOTIATION_ROUNDS: z.coerce.number().default(2),
   COOLDOWN_DAYS: z.coerce.number().default(3),

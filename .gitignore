@@ -44,3 +44,6 @@ scripts/setup-env.sh
 ITERATIONS.md
 DECISIONS.md
 BACKLOG.md
+
+# Persisted conversation sessions (local dev)
+.sessions/
