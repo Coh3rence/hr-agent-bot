@@ -46,7 +46,18 @@ export interface Agreement {
   commitmentPercent: number;
   durationMonths: number;
   settlementLikelihood: number;
-  status: "draft" | "submitted" | "under_review" | "escalated" | "approved" | "rejected" | "signed";
+  // `superseded` is terminal: the contributor replaced this proposal with a
+  // revised one. It keeps retired rows out of the review sweep and lets a
+  // reviewer's still-live inline keyboard be refused rather than filed.
+  status:
+    | "draft"
+    | "submitted"
+    | "under_review"
+    | "escalated"
+    | "approved"
+    | "rejected"
+    | "signed"
+    | "superseded";
   reviewerFeedback: ReviewerFeedback[];
   aggregatedCounterOffer: CounterOffer | null;
   negotiationRound: number;
@@ -107,5 +118,4 @@ export interface SessionData {
   pendingReviewAgreementId: string | null;
   pendingReviewDecision: "counter" | "reject" | null;
   negotiationContext: string | null;
-  negotiationRound: number;
 }

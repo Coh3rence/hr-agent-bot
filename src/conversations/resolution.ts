@@ -174,15 +174,27 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
       return;
     }
 
+    // Build the brief before retiring the row — it reads the counter-offer off
+    // the agreement being replaced.
+    const negotiationContext = await buildModifyContext(agreementId, ctx.sheets);
+
+    // Retire the reviewed proposal. Left `under_review` it stayed in the sweep's
+    // view and kept every reviewer's inline keyboard answerable, so late taps
+    // landed on terms the contributor had already walked back.
+    await ctx.sheets
+      .updateAgreementStatus(agreementId, "superseded")
+      .catch((err) =>
+        console.error(`handleResolution modify: could not supersede ${agreementId}:`, err)
+      );
+
     // Re-enter negotiation. Clear currentAgreementId so a fresh draft is created
     // when the new terms complete. The prior offer + counter + reviewer reasons
     // ride in negotiationContext (D-012) as system-prompt background, keeping
     // messageHistory a clean user-first transcript.
-    ctx.session.negotiationRound = agreement.negotiationRound + 1;
     ctx.session.currentAgreementId = null;
     ctx.session.phase = "negotiation";
     ctx.session.messageHistory = [];
-    ctx.session.negotiationContext = await buildModifyContext(agreementId, ctx.sheets);
+    ctx.session.negotiationContext = negotiationContext;
 
     await ctx.reply(
       "No problem — let's revise your terms. What would you like to change? " +
@@ -278,5 +290,4 @@ function resetSession(ctx: BotContext): void {
   ctx.session.selectedOpportunityId = null;
   ctx.session.messageHistory = [];
   ctx.session.negotiationContext = null;
-  ctx.session.negotiationRound = 1;
 }

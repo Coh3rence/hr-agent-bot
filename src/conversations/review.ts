@@ -27,10 +27,22 @@ export async function handleReview(ctx: BotContext): Promise<void> {
 
     await notifyReviewers(ctx, agreementId);
   } else if (data.startsWith("review:modify:")) {
+    const agreementId = data.replace("review:modify:", "");
+    // Retire the draft rather than leaving it beside its replacement: its own
+    // "Submit for Review" button stays live in the chat forever, and tapping it
+    // later would push terms the contributor has since abandoned to reviewers.
+    // Non-fatal: a stale draft left behind is worse than nothing, but stranding
+    // the contributor outside negotiation over a Sheets hiccup is worse still.
+    await ctx.sheets
+      .updateAgreementStatus(agreementId, "superseded")
+      .catch((err) => console.error(`review:modify: could not supersede ${agreementId}:`, err));
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+    ctx.session.currentAgreementId = null;
     ctx.session.phase = "negotiation";
     await ctx.reply("No problem. What would you like to change? You can update your rate, commitment %, or duration.");
   } else if (data.startsWith("review:approve:")) {
     const agreementId = data.replace("review:approve:", "");
+    if (!(await ensureOpenForReview(ctx, agreementId))) return;
     const ok = await recordReviewerDecision(ctx, agreementId, "approve", null, null, "");
     if (ok) {
       await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
@@ -44,6 +56,7 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     }
   } else if (data.startsWith("review:counter:")) {
     const agreementId = data.replace("review:counter:", "");
+    if (!(await ensureOpenForReview(ctx, agreementId))) return;
     ctx.session.pendingReviewAgreementId = agreementId;
     ctx.session.pendingReviewDecision = "counter";
     ctx.session.phase = "reviewer_feedback";
@@ -58,6 +71,7 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     );
   } else if (data.startsWith("review:reject:")) {
     const agreementId = data.replace("review:reject:", "");
+    if (!(await ensureOpenForReview(ctx, agreementId))) return;
     ctx.session.pendingReviewAgreementId = agreementId;
     ctx.session.pendingReviewDecision = "reject";
     ctx.session.phase = "reviewer_feedback";
@@ -67,6 +81,29 @@ export async function handleReview(ctx: BotContext): Promise<void> {
         "Include what would need to change for this to pass (e.g. lower rate, higher commitment, different role fit)."
     );
   }
+}
+
+/**
+ * A reviewer's inline keyboard lives in their chat forever, but the proposal it
+ * points at does not. Once the contributor has revised it — or it has been
+ * decided — a tap must be refused: recording it files an opinion about terms
+ * nobody is offering any more, which is how an approval of a withdrawn $50 ask
+ * ends up looking like sign-off on a live $40 one.
+ */
+export async function ensureOpenForReview(ctx: BotContext, agreementId: string): Promise<boolean> {
+  const agreement = await ctx.sheets.getAgreement(agreementId);
+  if (agreement?.status === "under_review") return true;
+
+  if (!agreement) console.error(`ensureOpenForReview: agreement ${agreementId} not found`);
+
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  await ctx.reply(
+    agreement
+      ? "This proposal is no longer open for review — the contributor revised it, or it's already been decided. " +
+          "If the revised version needs your input, it'll arrive as a new message."
+      : "I couldn't find that proposal — it may have been removed."
+  );
+  return false;
 }
 
 export interface ParsedCounter {
@@ -129,6 +166,15 @@ async function collectReviewerFeedback(ctx: BotContext, text: string): Promise<v
   const agreementId = ctx.session.pendingReviewAgreementId;
   const decision = ctx.session.pendingReviewDecision;
   if (!agreementId || !decision) {
+    ctx.session.phase = "idle";
+    return;
+  }
+
+  // Re-check: the reviewer may have tapped Counter while the proposal was open
+  // and only got round to typing after the contributor revised it.
+  if (!(await ensureOpenForReview(ctx, agreementId))) {
+    ctx.session.pendingReviewAgreementId = null;
+    ctx.session.pendingReviewDecision = null;
     ctx.session.phase = "idle";
     return;
   }

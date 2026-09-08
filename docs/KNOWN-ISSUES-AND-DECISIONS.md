@@ -43,6 +43,21 @@
 - This affects rate negotiation — a lower fiat rate may be acceptable if equity is offered
 - TODO: Add equity fields to Opportunity and Agreement models
 
+**Client framing (Gustavo, 2026-09-08 QA session) — this scopes the work usefully:**
+- The natural shape is: the applicant asks in **$**, and the reviewers' counter-offer can trade
+  cash for TeamPoints — *"we don't have that much money, but we can give you these extra
+  TeamPoints."* The split is the negotiable lever, not just the rate.
+- **What a TeamPoint is worth is explicitly out of scope for the bot.** Its value (sweat equity,
+  future retribution, utility in whatever the team produces) is settled person-to-person. The bot
+  carries two numbers through the flow; it does not model or argue token valuation.
+- That framing keeps this small. The downstream model **already supports it**:
+  `betaApp.ts:135-136` sends `marketRate` (total monthly value) alongside `fiatRequested` (the cash
+  portion), and the bot currently hardcodes `fiatRequested` to `DEFAULT_FIAT_REQUESTED` (0 = all
+  TeamPoints). The gap is entirely in the *negotiation and review* surface — nothing in the bridge
+  or the backend needs changing.
+- Concretely: let a reviewer's counter carry a cash portion as well as a rate, show the contributor
+  both numbers in the offer, and pass the agreed split through instead of the hardcoded default.
+
 ---
 
 ## Open Issues (Production Blockers & Hardening)
@@ -171,3 +186,58 @@
   caching can absorb. That is a store migration, materially larger than the session-persistence
   change in `FIX-PLAN-DEF10-SESSION-PERSISTENCE.md`, and out of MVP scope. The Sheet is deliberate
   for the MVP so the client can inspect state directly (QA document §5).
+
+### 14. Renegotiating orphans the previous agreement — FIXED IN CODE, AWAITING DEPLOY
+- `review:modify:` (`src/conversations/review.ts:29`) only sets `phase = "negotiation"` and replies.
+  It never touches the agreement the contributor is walking away from, and `negotiation.ts:123`
+  then inserts a **new** row. Nothing marks the old one superseded.
+- **Observed live 2026-09-08** on contributor `c_1788807562702`: three Agreements rows for one
+  application — `a_1788808260898` still `under_review` after being superseded, an abandoned `draft`
+  `a_1788858346291`, and the live `a_1788858438270`.
+- **Consequences, in order of severity:**
+  1. The superseded row keeps its 48h deadline, so the timeout sweep will **escalate a dead
+     proposal** and DM every admin about it. This is the user-visible one.
+  2. Reviewers still hold live buttons on the old proposal and can record decisions against it.
+  3. Abandoned `draft` rows accumulate — one per renegotiation pass — and never get cleaned up.
+- **Not a data-integrity issue.** The live agreement is correct and the contributor's terms are
+  right; the damage is noise and reviewer confusion, not a wrong hire or a wrong rate.
+- **Related — DEF-1's round cap can be bypassed (verified 2026-09-08, not just suspected).**
+  The cap itself is correct: `resolution.ts:161` reads the round off the *persisted row* rather
+  than the session, refuses a third round, and `resolution.ts:181` carries `round + 1` onto the
+  replacement. But that is the only path that maintains the counter. Two routes reset it to 1:
+  - `bot.ts:137` — re-selecting an opportunity (`select_opp:`) hard-sets
+    `ctx.session.negotiationRound = 1`. A contributor who navigates back to their matches and picks
+    the role again gets a fresh round budget.
+  - Session loss (DEF-10) — the `initial()` factory returns `negotiationRound: 1`, so any restart
+    mid-negotiation silently restores a full budget. Fixed by the persistence change, but only for
+    restarts, not for the `select_opp:` route.
+  - `review.ts:29` (`review:modify:`, the pre-submission edit) leaves the counter untouched, which
+    is correct — that edit happens before a round is consumed.
+  Evidence: `a_1788858438270` is genuinely a second-round proposal and is recorded as round 1.
+**FIXED IN CODE, AWAITING DEPLOY (2026-09-08).** Four changes:
+
+1. **New terminal status `superseded`** (`models/types.ts`). Both renegotiation paths now retire the
+   row they replace: `review:modify:` (pre-submission draft) and `resolution.ts` `action === "modify"`
+   (post-review). The timeout sweep already skips anything not `under_review`, so consequence (1) —
+   escalating a dead proposal — goes away with no change to `timeout.ts`. The status write is
+   deliberately non-fatal: a stale row left behind beats stranding the contributor outside
+   negotiation over a Sheets hiccup.
+2. **Reviewer buttons are checked against live status** (`ensureOpenForReview`, `review.ts`). A tap on
+   a keyboard for a proposal that is no longer `under_review` is refused with an explanation instead
+   of recorded, closing consequence (2). Re-checked again in `collectReviewerFeedback`, since a
+   reviewer can tap Counter while the proposal is open and only type their reply after it is revised.
+3. **The round counter moved out of the session and into the sheet.** `SessionData.negotiationRound`
+   is deleted — it was written in four places and read in one. `nextNegotiationRound()` derives the
+   round from the contributor's prior agreements for that opportunity, counting only rows that were
+   actually reviewed and countered (column N populated). Both bypass routes are closed: `select_opp:`
+   no longer resets anything, and a restart has nothing to lose. Abandoned drafts and no-quorum
+   escalations correctly do not burn a round.
+4. `review:modify:` also clears `currentAgreementId` and strips the old keyboard, so a stale
+   "Submit for Review" button can't push withdrawn terms to reviewers.
+
+Consequence (3) — accumulating `draft` rows — is *not* fixed. The rows are still written; they are
+now marked `superseded` rather than left as live `draft`s, which removes the hazard but not the
+clutter. Purging them is deferred: harmless at current volume, see §13.
+
+Tests: `nextRoundFromHistory` (round consumption rule, incl. per-role isolation and that the cap
+still bites) and `ensureOpenForReview` (open / superseded / decided / draft / missing).

@@ -123,7 +123,7 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       status: "draft",
       reviewerFeedback: [],
       aggregatedCounterOffer: null,
-      negotiationRound: ctx.session.negotiationRound,
+      negotiationRound: await ctx.sheets.nextNegotiationRound(contributor.id, oppId),
       submittedAt: new Date().toISOString(),
       reviewedAt: null,
       betaAppAgreementId: null,

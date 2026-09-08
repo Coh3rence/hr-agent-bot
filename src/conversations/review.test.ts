@@ -1,7 +1,55 @@
 import { describe, expect, test } from "bun:test";
-import { parseCounterFeedback } from "./review";
+import { ensureOpenForReview, parseCounterFeedback } from "./review";
+import type { BotContext } from "../bot";
 import { ClaudeService } from "../services/claude";
-import type { ReviewerFeedback } from "../models/types";
+import type { Agreement, ReviewerFeedback } from "../models/types";
+
+function reviewerCtx(status: Agreement["status"] | null) {
+  const replies: string[] = [];
+  const ctx = {
+    sheets: {
+      getAgreement: async () => (status === null ? null : ({ id: "a_1", status } as Agreement)),
+    },
+    editMessageReplyMarkup: async () => {},
+    reply: async (text: string) => {
+      replies.push(text);
+    },
+  } as unknown as BotContext;
+  return { ctx, replies };
+}
+
+describe("ensureOpenForReview", () => {
+  test("an open proposal accepts the reviewer's tap", async () => {
+    const { ctx, replies } = reviewerCtx("under_review");
+    expect(await ensureOpenForReview(ctx, "a_1")).toBe(true);
+    expect(replies).toEqual([]);
+  });
+
+  // The live QA failure: the contributor revised a $50 ask down to $40, but the
+  // reviewer's original keyboard still worked, so their approval of the withdrawn
+  // $50 was recorded and read as sign-off on the live proposal.
+  test("a superseded proposal refuses the tap and says why", async () => {
+    const { ctx, replies } = reviewerCtx("superseded");
+    expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("no longer open for review");
+  });
+
+  test("an already-decided proposal refuses the tap", async () => {
+    const { ctx } = reviewerCtx("approved");
+    expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
+  });
+
+  test("a draft is not reviewable — Submit has not been tapped yet", async () => {
+    const { ctx } = reviewerCtx("draft");
+    expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
+  });
+
+  test("a missing agreement refuses rather than throwing", async () => {
+    const { ctx, replies } = reviewerCtx(null);
+    expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("couldn't find");
+  });
+});
 
 describe("parseCounterFeedback", () => {
   test("leading bare number is the rate", () => {

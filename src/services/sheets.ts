@@ -2,6 +2,31 @@ import { google, sheets_v4 } from "googleapis";
 import type { Env } from "../config";
 import type { Opportunity, Contributor, Agreement, ReviewerFeedback } from "../models/types";
 
+export interface AgreementRoundRow {
+  contributorId: string;
+  opportunityId: string;
+  /** True once reviewers responded and an aggregated counter-offer was written. */
+  countered: boolean;
+}
+
+/**
+ * A round is consumed by reviewers responding, not by a contributor redrafting.
+ * So an abandoned draft, a proposal still awaiting review, and one that escalated
+ * without quorum all leave the count alone — only a proposal that came back with
+ * an aggregated counter-offer advances it. Pure so the cap can be tested without
+ * the Sheets client.
+ */
+export function nextRoundFromHistory(
+  rows: AgreementRoundRow[],
+  contributorId: string,
+  opportunityId: string
+): number {
+  const consumed = rows.filter(
+    (r) => r.contributorId === contributorId && r.opportunityId === opportunityId && r.countered
+  ).length;
+  return consumed + 1;
+}
+
 export class SheetsService {
   private sheets!: sheets_v4.Sheets;
   private spreadsheetId: string;
@@ -286,6 +311,29 @@ export class SheetsService {
 
     const row = (res.data.values || []).find((r) => r[0] === id);
     return !!(row && row[13] && String(row[13]).trim());
+  }
+
+  /**
+   * The negotiation round a fresh proposal for this contributor+opportunity
+   * belongs to. Derived from the sheet rather than the session because session
+   * state resets on restart and on re-selecting the same opportunity — either of
+   * which used to hand the contributor unlimited rounds.
+   */
+  async nextNegotiationRound(contributorId: string, opportunityId: string): Promise<number> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:N",
+    });
+
+    const history = (res.data.values || [])
+      .filter((r) => r[0])
+      .map((r) => ({
+        contributorId: r[2],
+        opportunityId: r[1],
+        countered: !!(r[13] && String(r[13]).trim()),
+      }));
+
+    return nextRoundFromHistory(history, contributorId, opportunityId);
   }
 
   async addAgreement(agreement: Agreement): Promise<void> {

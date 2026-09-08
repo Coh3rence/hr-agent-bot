@@ -63,7 +63,6 @@ bot.use(
       pendingReviewAgreementId: null,
       pendingReviewDecision: null,
       negotiationContext: null,
-      negotiationRound: 1,
     }),
     storage: new FileAdapter<SessionData>({ dirName: config.SESSION_DIR }),
   })
@@ -134,7 +133,6 @@ bot.on("callback_query:data", async (ctx) => {
   } else if (data.startsWith("select_opp:")) {
     ctx.session.selectedOpportunityId = data.replace("select_opp:", "");
     ctx.session.phase = "negotiation";
-    ctx.session.negotiationRound = 1;
     await ctx.answerCallbackQuery();
     await handleNegotiation(ctx);
   } else if (data.startsWith("review:")) {
