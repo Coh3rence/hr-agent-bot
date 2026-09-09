@@ -5,15 +5,16 @@ import type { Opportunity, Contributor, Agreement, ReviewerFeedback } from "../m
 export interface AgreementRoundRow {
   contributorId: string;
   opportunityId: string;
-  /** True once reviewers responded and an aggregated counter-offer was written. */
-  countered: boolean;
+  /** True once the review closed and a result was written back for the candidate. */
+  reviewed: boolean;
 }
 
 /**
- * A round is consumed by reviewers responding, not by a contributor redrafting.
- * So an abandoned draft, a proposal still awaiting review, and one that escalated
- * without quorum all leave the count alone — only a proposal that came back with
- * an aggregated counter-offer advances it. Pure so the cap can be tested without
+ * A round is consumed by reviewers spending a cycle on a proposal, not by a
+ * contributor redrafting. So an abandoned draft, a proposal still awaiting
+ * review, and one that escalated without quorum all leave the count alone.
+ * A unanimous approval the contributor then chose to renegotiate *does* count —
+ * the reviewers did the work either way. Pure so the cap can be tested without
  * the Sheets client.
  */
 export function nextRoundFromHistory(
@@ -22,7 +23,7 @@ export function nextRoundFromHistory(
   opportunityId: string
 ): number {
   const consumed = rows.filter(
-    (r) => r.contributorId === contributorId && r.opportunityId === opportunityId && r.countered
+    (r) => r.contributorId === contributorId && r.opportunityId === opportunityId && r.reviewed
   ).length;
   return consumed + 1;
 }
@@ -330,7 +331,7 @@ export class SheetsService {
       .map((r) => ({
         contributorId: r[2],
         opportunityId: r[1],
-        countered: !!(r[13] && String(r[13]).trim()),
+        reviewed: !!(r[13] && String(r[13]).trim()),
       }));
 
     return nextRoundFromHistory(history, contributorId, opportunityId);

@@ -5,7 +5,7 @@ const C = "c_1";
 const O = "opp_1";
 
 function row(over: Partial<AgreementRoundRow> = {}): AgreementRoundRow {
-  return { contributorId: C, opportunityId: O, countered: true, ...over };
+  return { contributorId: C, opportunityId: O, reviewed: true, ...over };
 }
 
 describe("nextRoundFromHistory", () => {
@@ -13,16 +13,22 @@ describe("nextRoundFromHistory", () => {
     expect(nextRoundFromHistory([], C, O)).toBe(1);
   });
 
-  test("a countered proposal advances the round", () => {
+  test("a reviewed proposal advances the round", () => {
     expect(nextRoundFromHistory([row()], C, O)).toBe(2);
   });
 
+  // Observed live 2026-09-09: both reviewers approved, then the contributor tapped
+  // Modify anyway. The reviewers spent a cycle either way, so it counts.
+  test("a unanimous approval the contributor renegotiated still burns a round", () => {
+    expect(nextRoundFromHistory([row({ reviewed: true })], C, O)).toBe(2);
+  });
+
   test("an abandoned draft does not burn a round", () => {
-    expect(nextRoundFromHistory([row({ countered: false })], C, O)).toBe(1);
+    expect(nextRoundFromHistory([row({ reviewed: false })], C, O)).toBe(1);
   });
 
   test("a proposal still awaiting review does not burn a round", () => {
-    expect(nextRoundFromHistory([row({ countered: true }), row({ countered: false })], C, O)).toBe(2);
+    expect(nextRoundFromHistory([row({ reviewed: true }), row({ reviewed: false })], C, O)).toBe(2);
   });
 
   // Rounds are per-role: countering a contributor on one opportunity must not

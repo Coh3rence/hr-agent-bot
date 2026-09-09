@@ -58,6 +58,25 @@
 - Concretely: let a reviewer's counter carry a cash portion as well as a rate, show the contributor
   both numbers in the offer, and pass the agreed split through instead of the hardcoded default.
 
+**Sharper than "a missing parameter" — the default is applied silently (verified live 2026-09-09).**
+Neither `DEFAULT_FIAT_REQUESTED` nor `FTE_HOURS_PER_MONTH` is set in Railway, so the defaults stand.
+When contributor `c_1788807562702` accepts, the bot will POST `marketRate: 6400` ($40/hr x 160h),
+`fiatRequested: 0`, `commitment: 50` — i.e. **$6,400/month of value, none of it in cash.**
+
+Now compare what the humans said. The contributor asked in dollars, the reviewer's counter was
+*"It's above our budget for this role, can we reduce it to $40?"* — a sentence about **money** — and
+the offer he is looking at reads "$40/hr". The record that comes out the other end says zero money.
+Nobody in that conversation agreed to a split, because nobody was asked; the default quietly chose
+one. This is a documented decision (D-015), not a bug, but a decision only works if the people it
+binds know it is being made, and this run shows they don't. The live agreement is the most useful
+possible prompt for the client conversation — it is Gustavo's own terms demonstrating his point.
+
+**Open question for the client, worth answering before any of this is built:** `marketRate` is a
+full-time-equivalent figure (hourly x 160) sent *alongside* `commitment: 50`. That is correct only
+if Collabberry reads `marketRate` as an FTE benchmark and pro-rates it by commitment. If it reads it
+as actual monthly compensation, the figure is double what it should be. Not asserted either way —
+but it is the kind of mismatch that quietly pays someone 2x.
+
 ---
 
 ## Open Issues (Production Blockers & Hardening)
@@ -107,7 +126,7 @@
 - **Fix idea:** add structured logging around phase transitions and Beta App calls
   (submit, review decision, resolve, createAgreement) for production support/observability.
 
-### 10. Conversation state is in-memory only — lost on every restart — HARDENING
+### 10. Conversation state is in-memory only — lost on every restart — FIXED IN CODE, AWAITING DEPLOY
 - `src/bot.ts` installs grammy's `session()` with no storage adapter, so all conversation state
   (phase, message history, in-flight agreement/review ids) lives in process memory.
 - Any restart — deploy, crash, or the Telegram 409 `getUpdates` conflict / Railway restart cycle —
@@ -117,8 +136,15 @@
   same info 10x" after the bot restarted several times behind a 409.
 - **Operational workaround:** never `railway up` mid-session; confirm the log tail has no recent 409
   before a witnessed run.
-- **Fix idea:** back `session()` with a persistent adapter (a Sheet tab, Redis, or the existing
-  MySQL) keyed on Telegram id, so state survives restarts.
+**FIXED IN CODE, AWAITING DEPLOY (2026-09-08).** `session()` is backed by `@grammyjs/storage-file`
+writing to `SESSION_DIR`, plus a message-history cap (`SESSION_HISTORY_LIMIT`) and a 7-day expiry
+sweep on the existing scheduler. See §12 for why file-backed rather than Redis, and the deploy note
+below.
+
+> **Deploy prerequisite — the fix is inert without it.** `SESSION_DIR` defaults to `.sessions`,
+> which on Railway is container-local and discarded on every restart, i.e. exactly the bug this
+> fixes. The deploy MUST attach a volume at `/data` and set `SESSION_DIR=/data/sessions`. The
+> resolved path is logged on boot so a misconfiguration is visible rather than silent.
 
 ### 11. Reviewer counter rate is only parsed from a LEADING number — FIXED IN CODE, AWAITING DEPLOY
 - `parseCounterFeedback` (`src/conversations/review.ts`) matches the rate with `/^\s*\$?(\d+...)/`,
@@ -201,6 +227,24 @@
   3. Abandoned `draft` rows accumulate — one per renegotiation pass — and never get cleaned up.
 - **Not a data-integrity issue.** The live agreement is correct and the contributor's terms are
   right; the damage is noise and reviewer confusion, not a wrong hire or a wrong rate.
+
+**Recurred live 2026-09-09, and consequence (2) is worse than first assessed.** After both
+reviewers approved `a_1788858438270`, the contributor tapped **Modify Terms** on the offer — by his
+own account simply because the button was there — renegotiated, and resubmitted as
+`a_1788962327012` with **identical** terms ($40/hr, 50%, 6 months, likelihood 86). That leaves two
+`under_review` rows whose reviewer DMs are *character-for-character the same*. On 2026-09-08 the
+stale message was at least distinguishable by price ($50 vs $40); here nothing distinguishes them
+but position in the chat.
+
+The failure mode is a **silent no-op that looks like success**: a tap on the older message writes a
+ReviewFeedback row against the dead agreement, `maybeCompleteReview` then bails because that row is
+already aggregated, and the live proposal receives nothing. The reviewer believes they approved.
+Quorum is never reached and the proposal escalates at its 48h deadline with no one aware anything
+was missed. Mitigated on the day only by telling both reviewers to go by message position.
+
+This also re-demonstrates the round-cap bypass: `a_1788962327012` is a second review cycle recorded
+as `negotiationRound = 1`, so nothing would have stopped a third or fourth loop, each one spawning
+another indistinguishable pair of buttons.
 - **Related — DEF-1's round cap can be bypassed (verified 2026-09-08, not just suspected).**
   The cap itself is correct: `resolution.ts:161` reads the round off the *persisted row* rather
   than the session, refuses a third round, and `resolution.ts:181` carries `round + 1` onto the
@@ -228,8 +272,10 @@
    reviewer can tap Counter while the proposal is open and only type their reply after it is revised.
 3. **The round counter moved out of the session and into the sheet.** `SessionData.negotiationRound`
    is deleted — it was written in four places and read in one. `nextNegotiationRound()` derives the
-   round from the contributor's prior agreements for that opportunity, counting only rows that were
-   actually reviewed and countered (column N populated). Both bypass routes are closed: `select_opp:`
+   round from the contributor's prior agreements for that opportunity, counting only rows whose
+   review actually closed and returned a result (column N populated) — including a unanimous
+   approval the contributor then renegotiated, since reviewers spent a cycle either way. Abandoned
+   drafts and no-quorum escalations do not burn a round. Both bypass routes are closed: `select_opp:`
    no longer resets anything, and a restart has nothing to lose. Abandoned drafts and no-quorum
    escalations correctly do not burn a round.
 4. `review:modify:` also clears `currentAgreementId` and strips the old keyboard, so a stale
