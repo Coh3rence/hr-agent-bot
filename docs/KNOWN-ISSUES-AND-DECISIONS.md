@@ -315,3 +315,39 @@ problem the moment a real contributor is also an admin, which the role model per
 broadcasts, filtering it out the same way `reviewRecipients` already does. The escalation is *about*
 the candidate, so they are exactly the wrong recipient. Cheap, but out of scope for the current
 deploy — recorded rather than fixed so the pending release stays limited to what has been tested.
+
+---
+
+### 16. A unanimously rejected candidate can hire themselves — DEFECT (most severe open item)
+
+`presentToCandidate` (`services/presentation.ts`) builds its keyboard **unconditionally** — Accept /
+Modify Terms / Walk away — and never branches on `CounterOffer.outcome`. `handleResolution`'s
+`accept` branch does not check the outcome either. So on an `all_reject` aggregation the candidate
+is shown:
+
+> The reviewers did not propose a rate.
+> Reviewers declined. Reasons: …
+> How would you like to proceed?   `[Accept] [Modify Terms] [Walk away]`
+
+Tapping **Accept** takes the normal approval path: `getCandidateOffer` returns non-null (the decline
+text populates column N), `suggestedRate` is null so `reconciledRate` falls back to the
+contributor's own asking rate, status is set to `approved`, an invite link is issued, and on signup
+the bot POSTs the agreement to Collabberry and marks the contributor `hired`.
+
+**A candidate every reviewer rejected can hire themselves at their original asking rate by tapping
+a button.** No reviewer is notified, nothing blocks it downstream — the on-chain signature is the
+only remaining human gate, and it comes after the record exists.
+
+**Severity note.** This is a different class from §11/§14, which produced noise and confusion but
+never a wrong outcome. This one writes a materially wrong result into the production system, and it
+requires no unusual behaviour from the candidate — "Accept" is the obvious button to press.
+
+**Not yet observed live.** No proposal has been unanimously rejected; every review so far has been
+all-approve or mixed. Found 2026-09-09 by tracing what a reject would do before asking a reviewer
+to test one, rather than from an incident.
+
+**Fix idea:** branch the presentation on outcome. On `all_reject` the only honest options are
+acknowledge and walk away (with the existing 3-day cooldown, §Match Parameters) — Accept should not
+be offered at all. Defend it in `handleResolution` too rather than relying on the keyboard alone,
+since callback data is replayable: an `accept` on an `all_reject` agreement must be refused
+server-side the same way `ensureOpenForReview` refuses a stale reviewer tap.
