@@ -287,3 +287,31 @@ clutter. Purging them is deferred: harmless at current volume, see §13.
 
 Tests: `nextRoundFromHistory` (round consumption rule, incl. per-role isolation and that the cap
 still bites) and `ensureOpenForReview` (open / superseded / decided / draft / missing).
+
+---
+
+### 15. Admin broadcasts are not filtered against the candidate — DEFECT
+
+`reviewRecipients` correctly excludes a contributor from reviewing their own proposal, but the two
+admin *broadcast* paths do not apply that filter — both DM everyone `getAdminIds()` returns:
+
+- `escalateReview` (`services/timeout.ts`) — on a 48h no-quorum expiry, sends *"agreement `<id>`
+  reached its 48h deadline without quorum (1/2 reviewers responded, 2 needed). It needs a manual
+  decision."*
+- `notifyAdminsOfWriteFailure` (`conversations/review.ts`) — on a failed feedback write, sends the
+  agreement id, the reviewer's name, and their decision.
+
+**Why it bites here.** In this deployment every participant is `role=admin` (see §Review pool), so
+a contributor who is also an admin receives internal review-process messaging about their own
+application — reviewer response counts, another reviewer's name and decision. Live risk right now:
+contributor `c_1788807562702` is admin `302836662`, so if `a_1788962327012` escalates on
+2026-09-11 13:58 UTC he is told his own proposal failed to reach quorum.
+
+**Not currently causing harm** — no escalation has fired — and it is partly an artefact of the QA
+setup, where the reviewer pool and the candidate overlap. It becomes a genuine confidentiality
+problem the moment a real contributor is also an admin, which the role model permits.
+
+**Fix idea:** resolve the agreement's contributor and pass their telegram id through to both
+broadcasts, filtering it out the same way `reviewRecipients` already does. The escalation is *about*
+the candidate, so they are exactly the wrong recipient. Cheap, but out of scope for the current
+deploy — recorded rather than fixed so the pending release stays limited to what has been tested.
