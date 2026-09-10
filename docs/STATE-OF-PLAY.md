@@ -62,64 +62,28 @@ Verified present in source on 2026-09-10.
 | round cap never bit | round derived from sheet history, not session memory | `sheets.ts:20` (pure `nextRoundFromHistory`), `sheets.ts:323`, used at `negotiation.ts:126` |
 | round cap enforcement | refuses a third attempt, offers accept-or-walk-away | `resolution.ts:161` |
 | §10 — conversation state lost on every restart | grammy sessions persisted via `FileAdapter`, with a TTL sweep | `bot.ts:67`, `config.ts:36`, `services/sessionStore.ts` |
+| §16 — a unanimously rejected candidate could hire themselves | verdict re-derived from feedback rows; no-button decline DM; server-side guard on `accept` | `services/quorum.ts`, `services/decline.ts`, `presentation.ts:60`, `resolution.ts:45` and `:251` |
+| §15 — admin-only alerts reached a candidate who is also an admin | both broadcasts route through `reviewRecipients` | `timeout.ts:137`, `review.ts:300` |
 
 `session.negotiationRound` has been fully removed — no references remain.
 
-**Test suite: 60 passing, 0 failing, across 5 files.** Typecheck clean.
+**Test suite: 96 passing, 0 failing, across 8 files.** Typecheck clean.
 
 ---
 
 ## 4. Remains to be built
 
-### 4.1 A unanimously rejected candidate can hire themselves — §16, most severe
+§16 and §15 were listed here earlier today and were **built on 2026-09-10** — they have moved up to
+§3. Two notes worth keeping, because both shaped the implementation:
 
-`presentToCandidate` builds its Accept / Modify / Walk away keyboard unconditionally and never
-branches on the review outcome. `handleResolution`'s `accept` branch does not check it either.
-**Confirmed by search on 2026-09-10: there is no outcome branching anywhere in `presentation.ts`,
-`resolution.ts` or `quorum.ts`.**
+- The aggregation outcome is never persisted (`updateAgreementAggregation` writes only rate, summary
+  and commitment), so the verdict is re-derived from the `ReviewFeedback` rows. The helper that does
+  it must agree with `aggregateFeedback` exactly — including its *lack* of a pool filter — or the
+  bot would build a counter-offer while refusing permission to accept it.
+- The §16 fix was smaller than first estimated: an all-reject outcome reuses the existing walk-away
+  closure rather than growing new copy. See §6.1.
 
-So on an all-reject aggregation the candidate is shown Accept. Tapping it takes the normal approval
-path — the suggested rate is null, so the rate falls back to the contributor's own asking figure,
-the status becomes `approved`, an invite is issued, and on signup the bot writes the agreement into
-Collabberry and marks them `hired`. No reviewer is notified. Nothing downstream blocks it.
-
-Not yet observed live — found by tracing what a rejection would do *before* asking a reviewer to
-test one.
-
-**Complication:** the aggregation outcome is never persisted. `updateAgreementAggregation` writes
-only the rate (M), the summary (N) and the commitment (Q). The verdict must therefore be
-re-derived from `ReviewFeedback` rows.
-
-**Shape of the fix:**
-1. Pure helper in `services/quorum.ts` — dedupe re-votes so a reviewer's latest decision wins,
-   ignore responders outside the pool, report whether every in-pool responder rejected.
-2. Branch the keyboard in `services/presentation.ts`.
-3. Guard the `accept` branch in `conversations/resolution.ts` server-side. Callback data is
-   replayable, so hiding a button is not the same as disabling it.
-4. Route the round-cap branch (`resolution.ts:161`, which also offers "Accept offer") through the
-   same guard, or it becomes a back door.
-
-**Scope is smaller than first estimated** — see §6.1. An all-reject outcome can reuse the existing
-walk-away behaviour rather than growing new copy.
-
-### 4.2 Admin-only messages reach a candidate who is also an admin — §15
-
-Two broadcast paths DM everyone `getAdminIds()` returns without applying the `reviewRecipients`
-filter that already excludes a contributor from reviewing their own proposal:
-
-- `escalateReview` — `services/timeout.ts:123`
-- `notifyAdminsOfWriteFailure` — `conversations/review.ts:295`
-
-(For contrast, `timeout.ts:96` and `review.ts:319`/`:377` *do* filter correctly — the bug is
-specific to these two broadcasts.)
-
-Gustavo is admin `302836662`, so he would receive reviewer response counts and other reviewers'
-names and decisions about his own application. Not yet harmful — no escalation has fired — but the
-role model permits a real contributor to be an admin.
-
-Fix: thread the agreement's contributor telegram id into both and filter it out.
-
-### 4.3 Prior-attempt history is stored but never surfaced — new, 2026-09-10
+### 4.1 Prior-attempt history is stored but never surfaced — new, 2026-09-10
 
 The client asked that a returning contributor be flagged with context from the previous round:
 *"this has been attempted before"*, the reasons it did not work, and the opinions from that round.
@@ -244,15 +208,23 @@ proves the wiring.
 | §14 dead proposals answerable | ✅ 5 tests | ❌ | unit only |
 | round counter stuck at 1 | ✅ 8 tests | ❌ | unit only |
 | §10 state lost on restart | ✅ | ❌ | unit only |
-| §16 rejected can self-hire | ❌ | ❌ | **neither** |
-| §15 alerts leak to candidate | ❌ | ❌ | **neither** |
+| §16 rejected can self-hire | ✅ 27 tests | ❌ | unit only |
+| §15 alerts leak to candidate | ✅ 9 tests | ❌ | unit only |
 | §6 TeamPoints split | — | ❌ | blocked on client |
 
-**Unit tests to add.** For §16: all reject → blocked; mixed → allowed; all approve → allowed; no
-responses → allowed; reject-then-approve re-vote → allowed (latest wins); out-of-pool responder
-ignored; all-reject keyboard omits Accept; normal keyboard unchanged; replayed accept on a rejected
-agreement refused. For §15: escalation recipients exclude the candidate when the candidate is also
-an admin; same for the write-failure alert.
+**Unit coverage added 2026-09-10.** §16 across three files: unanimity semantics in
+`services/quorum.test.ts` (all reject, lone reject, mixed, counter-is-not-rejection, no responses,
+re-votes in both directions, and the deliberately unfiltered out-of-pool responder);
+`services/presentation.test.ts` (all-reject DM carries no keyboard and quotes no rate, the attempt
+is closed and the contributor cooled down, while mixed / counter / all-approve / no-feedback still
+get the three buttons, and the candidate is DM'd exactly once across both triggers); and
+`conversations/resolution.test.ts` (a replayed Accept on a declined proposal is refused, every
+non-unanimous verdict still accepted). §15 in `services/timeout.test.ts` and the
+`notifyAdminsOfWriteFailure` block of `conversations/review.test.ts`.
+
+One case in that list was deliberately **not** implemented as planned: the §16 helper does not
+ignore out-of-pool responders. `aggregateFeedback` does not filter by pool, so filtering in the
+guard would let the two disagree.
 
 **Live scenarios, after deploy.** All need a candidate who is not in the review pool — Gustavo is
 now `hired`, so either reset his record (`scripts/reset-test-data.ts`) or use a third Telegram
@@ -278,10 +250,10 @@ Scenarios 1–3 are the failures actually observed this week.
 
 ## 9. Ordered next steps
 
-1. Build §16 (routing all-reject into the existing walk-away behaviour) with unit tests.
-2. Build §15 (filter the candidate out of both admin broadcasts) with unit tests.
+1. ~~Build §16 (routing all-reject into the existing walk-away behaviour) with unit tests.~~ Done 2026-09-10.
+2. ~~Build §15 (filter the candidate out of both admin broadcasts) with unit tests.~~ Done 2026-09-10.
 3. Add the Railway volume and set `SESSION_DIR`.
-4. Push the eight commits and deploy. Confirm the new build is live.
+4. Push the pending commits and deploy. Confirm the new build is live.
 5. Mark the three stale rows `superseded`; verify an old button is now refused.
 6. Prepare a test candidate outside the review pool.
 7. Run live scenarios 1–5.

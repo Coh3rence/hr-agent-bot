@@ -290,7 +290,7 @@ still bites) and `ensureOpenForReview` (open / superseded / decided / draft / mi
 
 ---
 
-### 15. Admin broadcasts are not filtered against the candidate — DEFECT
+### 15. Admin broadcasts are not filtered against the candidate — FIXED IN CODE, AWAITING DEPLOY
 
 `reviewRecipients` correctly excludes a contributor from reviewing their own proposal, but the two
 admin *broadcast* paths do not apply that filter — both DM everyone `getAdminIds()` returns:
@@ -311,14 +311,24 @@ contributor `c_1788807562702` is admin `302836662`, so if `a_1788962327012` esca
 setup, where the reviewer pool and the candidate overlap. It becomes a genuine confidentiality
 problem the moment a real contributor is also an admin, which the role model permits.
 
-**Fix idea:** resolve the agreement's contributor and pass their telegram id through to both
-broadcasts, filtering it out the same way `reviewRecipients` already does. The escalation is *about*
-the candidate, so they are exactly the wrong recipient. Cheap, but out of scope for the current
-deploy — recorded rather than fixed so the pending release stays limited to what has been tested.
+**Fixed 2026-09-10.** Both broadcasts now resolve the agreement's contributor and route through
+`reviewRecipients` with the same self-review escape hatch the review pool uses, so a solo dev run
+still receives its own alerts. `escalateReview` takes the candidate's telegram id as a parameter and
+loops over the filtered list; the escalation counts quoted in the message were already computed
+against that pool, so they now agree with who was actually asked.
+
+`notifyAdminsOfWriteFailure` resolves the candidate **best-effort**: it runs on an already-failing
+Sheets path, so if the contributor lookup also fails it logs and falls back to the unfiltered admin
+list. Losing the alert entirely is worse than the narrower leak.
+
+Covered by `services/timeout.test.ts` (candidate excluded; other reviewers still alerted; non-admin
+candidate leaves the list intact; status moves to `escalated`, never auto-approved; counts quoted
+against the filtered pool) and the `notifyAdminsOfWriteFailure` block in
+`conversations/review.test.ts` (including the fallback when the lookup throws).
 
 ---
 
-### 16. A unanimously rejected candidate can hire themselves — DEFECT (most severe open item)
+### 16. A unanimously rejected candidate can hire themselves — FIXED IN CODE, AWAITING DEPLOY
 
 `presentToCandidate` (`services/presentation.ts`) builds its keyboard **unconditionally** — Accept /
 Modify Terms / Walk away — and never branches on `CounterOffer.outcome`. `handleResolution`'s
@@ -346,8 +356,33 @@ requires no unusual behaviour from the candidate — "Accept" is the obvious but
 all-approve or mixed. Found 2026-09-09 by tracing what a reject would do before asking a reviewer
 to test one, rather than from an incident.
 
-**Fix idea:** branch the presentation on outcome. On `all_reject` the only honest options are
-acknowledge and walk away (with the existing 3-day cooldown, §Match Parameters) — Accept should not
-be offered at all. Defend it in `handleResolution` too rather than relying on the keyboard alone,
-since callback data is replayable: an `accept` on an `all_reject` agreement must be refused
-server-side the same way `ensureOpenForReview` refuses a stale reviewer tap.
+**Fixed 2026-09-10**, in two layers, because hiding a button is not disabling it.
+
+*The verdict has to be recomputed.* `updateAgreementAggregation` persists only the rate, summary and
+commitment — the `outcome` field is never written to the sheet, so there is nothing to branch on
+after a restart. The verdict is therefore derived from the ReviewFeedback rows by a new
+`unanimouslyRejected` in `services/quorum.ts`. It must agree with `aggregateFeedback` *exactly*: if
+the guard and the aggregation disagreed, the bot would build a counter-offer while refusing the
+candidate permission to accept it. So `dedupLatestPerReviewer` was moved out of `claude.ts` into
+`quorum.ts` and both now share it, and — deliberately, matching aggregation — neither filters
+against the review pool. A reviewer who votes twice is counted once, by their latest word.
+
+*Layer 1, presentation.* `presentToCandidate` branches before building the keyboard. On a unanimous
+rejection the DM carries **no buttons at all** and never quotes a rate. The client's rule for an
+attempt that ends without agreement is the same one walking away follows — thank them, cool down,
+invite them back — so the attempt is closed here rather than left open waiting for the candidate to
+consent to their own rejection. Both endings now share `services/decline.ts` (`closeAsDeclined`:
+status → `rejected`, contributor → `cooldown`, `previousAttempts` incremented). Ordering is
+load-bearing: the close runs *after* `markCandidateNotified`, so a failed send retries the DM rather
+than re-incrementing the attempt count.
+
+*Layer 2, the handler.* `refuseIfDeclined` guards the `accept` branch of `handleResolution`, since
+callback data is replayable — an Accept from an earlier round, or from a message sent before this
+fix, stays tappable in the chat forever. It also covers the round-cap branch, which offers its own
+Accept button.
+
+Covered by `services/quorum.test.ts` (unanimity semantics, including re-votes and the deliberate
+absence of a pool filter), `services/presentation.test.ts` (no keyboard, no rate quoted, attempt
+closed and cooled down; mixed/counter/all-approve/no-feedback still get the three buttons) and
+`conversations/resolution.test.ts` (a replayed Accept is refused; every non-unanimous verdict is
+still accepted).
