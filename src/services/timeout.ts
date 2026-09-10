@@ -110,24 +110,38 @@ async function completeExpiredReview(
     return;
   }
 
-  await escalateReview(agreementId, recipients.length, responded, sheets, notifier);
+  await escalateReview(
+    agreementId,
+    recipients.length,
+    responded,
+    contributor.telegramId,
+    sheets,
+    notifier
+  );
 }
 
 async function escalateReview(
   agreementId: string,
   poolSize: number,
   responded: number,
+  contributorTelegramId: string,
   sheets: SheetsService,
   notifier: Notifier
 ): Promise<void> {
   const adminIds = await sheets.getAdminIds();
+  // The escalation is *about* the candidate, so they are exactly the wrong
+  // recipient — and in this deployment every participant is an admin, so an
+  // unfiltered broadcast tells an applicant how many reviewers weighed in on
+  // their own application. Same filter the review pool uses, including the
+  // dev-only self-review escape hatch, so a solo test run still gets the alert.
+  const recipients = reviewRecipients(adminIds, contributorTelegramId, selfReviewAllowed());
   const message =
     `Review escalation: agreement ${agreementId} reached its 48h deadline without quorum ` +
     `(${responded}/${poolSize} reviewers responded, ${quorumThreshold(poolSize)} needed). ` +
     `It needs a manual decision — no counter-offer was generated.`;
 
   // DM admins first so the escalation is delivered even if the status write fails.
-  for (const adminId of adminIds) {
+  for (const adminId of recipients) {
     try {
       await notifier.sendMessage(Number(adminId), message);
     } catch (err) {

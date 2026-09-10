@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { ensureOpenForReview, parseCounterFeedback } from "./review";
+import { ensureOpenForReview, notifyAdminsOfWriteFailure, parseCounterFeedback } from "./review";
 import type { BotContext } from "../bot";
 import { ClaudeService } from "../services/claude";
-import type { Agreement, ReviewerFeedback } from "../models/types";
+import type { Agreement, Contributor, ReviewerFeedback } from "../models/types";
 
 function reviewerCtx(status: Agreement["status"] | null) {
   const replies: string[] = [];
@@ -48,6 +48,57 @@ describe("ensureOpenForReview", () => {
     const { ctx, replies } = reviewerCtx(null);
     expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
     expect(replies[0]).toContain("couldn't find");
+  });
+});
+
+function writeFailureCtx(opts: {
+  adminIds: string[];
+  candidateTelegramId?: string;
+  lookupThrows?: boolean;
+}) {
+  const dms: (number | string)[] = [];
+  const ctx = {
+    sheets: {
+      getAdminIds: async () => opts.adminIds,
+      getAgreement: async () => {
+        if (opts.lookupThrows) throw new Error("Sheets is down");
+        return { id: "a_1", contributorId: "c_1" } as Agreement;
+      },
+      getContributorById: async () =>
+        opts.candidateTelegramId
+          ? ({ id: "c_1", telegramId: opts.candidateTelegramId } as Contributor)
+          : null,
+    },
+    api: {
+      sendMessage: async (chatId: number) => {
+        dms.push(chatId);
+      },
+    },
+  } as unknown as BotContext;
+  return { ctx, dms };
+}
+
+// §15: the alert names another reviewer and their decision, and in this
+// deployment a contributor is often an admin too.
+describe("notifyAdminsOfWriteFailure", () => {
+  test("the candidate does not receive an alert about their own review", async () => {
+    const h = writeFailureCtx({ adminIds: ["100", "200", "300"], candidateTelegramId: "300" });
+    await notifyAdminsOfWriteFailure(h.ctx, "a_1", "Reviewer One", "approve", new Error("boom"));
+    expect(h.dms).toEqual([100, 200]);
+  });
+
+  test("a non-admin candidate leaves the alert list intact", async () => {
+    const h = writeFailureCtx({ adminIds: ["100", "200"], candidateTelegramId: "999" });
+    await notifyAdminsOfWriteFailure(h.ctx, "a_1", "Reviewer One", "approve", new Error("boom"));
+    expect(h.dms).toEqual([100, 200]);
+  });
+
+  // We are already on a Sheets failure path. Losing the alert entirely is worse
+  // than the narrower leak, so an unresolvable candidate falls back to all admins.
+  test("an alert still goes out when the candidate cannot be resolved", async () => {
+    const h = writeFailureCtx({ adminIds: ["100", "200"], lookupThrows: true });
+    await notifyAdminsOfWriteFailure(h.ctx, "a_1", "Reviewer One", "approve", new Error("boom"));
+    expect(h.dms).toEqual([100, 200]);
   });
 });
 

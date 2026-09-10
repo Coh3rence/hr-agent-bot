@@ -275,7 +275,7 @@ async function recordReviewerDecision(
   }
 }
 
-async function notifyAdminsOfWriteFailure(
+export async function notifyAdminsOfWriteFailure(
   ctx: BotContext,
   agreementId: string,
   reviewerName: string,
@@ -293,7 +293,24 @@ async function notifyAdminsOfWriteFailure(
 
   try {
     const adminIds = await ctx.sheets.getAdminIds();
-    for (const adminId of adminIds) {
+    // Exclude the candidate: this names another reviewer and their decision, and
+    // a contributor may themselves be an admin. Resolving them is best-effort —
+    // we are already on a Sheets failure path, so if the lookup also fails we
+    // keep the alert rather than lose it, and accept the narrower leak.
+    let recipients = adminIds;
+    try {
+      const agreement = await ctx.sheets.getAgreement(agreementId);
+      const contributor = agreement
+        ? await ctx.sheets.getContributorById(agreement.contributorId)
+        : null;
+      if (contributor) {
+        recipients = reviewRecipients(adminIds, contributor.telegramId, selfReviewAllowed());
+      }
+    } catch (e) {
+      console.error("notifyAdminsOfWriteFailure: could not resolve the candidate to exclude:", e);
+    }
+
+    for (const adminId of recipients) {
       await ctx.api.sendMessage(Number(adminId), message).catch((e) => {
         console.error(`notifyAdminsOfWriteFailure: failed to DM admin ${adminId}:`, e);
       });
