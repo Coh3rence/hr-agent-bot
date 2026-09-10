@@ -1,5 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import type { SheetsService } from "./sheets";
+import { unanimouslyRejected } from "./quorum";
+import { closeAsDeclined, COOLDOWN_DAYS } from "./decline";
 
 /**
  * Candidate-facing presentation of an aggregated review result (D-008/D-009).
@@ -44,6 +46,32 @@ export async function presentToCandidate(
   if (!contributor) {
     console.error(`presentToCandidate: contributor ${agreement.contributorId} not found`);
     return false;
+  }
+
+  // Every reviewer declined: there is no offer on the table, so there is nothing
+  // to accept or renegotiate. Offering "Accept" here let a declined candidate hire
+  // themselves at their own asking rate (§16) — the aggregation carries no
+  // suggested rate, so the accept path fell back to what they originally asked for.
+  //
+  // The client's rule for an attempt that ends without agreement is the same one
+  // walking away follows: thank them, cool down, invite them back. So the reply
+  // carries no buttons at all and the attempt is closed here, rather than left
+  // open waiting for the candidate to consent to their own rejection.
+  const feedbacks = await sheets.getReviewFeedbacks(agreementId);
+  if (unanimouslyRejected(feedbacks)) {
+    const message =
+      `Your proposal has been reviewed.\n\n` +
+      `Role: ${agreement.roleName}\n\n` +
+      `${offer.qualitativeSummary}\n\n` +
+      `Thank you for your time — we won't be moving forward with this one. ` +
+      `You're welcome to apply again after a ${COOLDOWN_DAYS}-day reflection period.`;
+
+    await notifier.sendMessage(Number(contributor.telegramId), message);
+    await sheets.markCandidateNotified(agreementId);
+    // After marking, so a failed send retries the DM rather than re-incrementing
+    // the contributor's attempt count.
+    await closeAsDeclined(agreementId, agreement.contributorId, sheets);
+    return true;
   }
 
   const rateLine =

@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { ReviewerFeedback } from "../models/types";
 import {
+  dedupLatestPerReviewer,
   isReviewComplete,
   outstandingReviewers,
   quorumThreshold,
   respondedReviewerIds,
   respondedWithinPool,
   reviewRecipients,
+  unanimouslyRejected,
 } from "./quorum";
 
 function feedback(reviewerId: string, decision: ReviewerFeedback["decision"] = "approve"): ReviewerFeedback {
@@ -120,6 +122,94 @@ describe("reviewRecipients", () => {
   test("sole admin applying to their own role yields an empty pool, not a self-approval", () => {
     expect(reviewRecipients(["candidate"], "candidate")).toEqual([]);
     expect(isReviewComplete(reviewRecipients(["candidate"], "candidate"), [feedback("candidate")])).toBe(
+      false
+    );
+  });
+});
+
+function vote(
+  reviewerId: string,
+  decision: ReviewerFeedback["decision"],
+  submittedAt: string
+): ReviewerFeedback {
+  return { ...feedback(reviewerId, decision), submittedAt };
+}
+
+describe("dedupLatestPerReviewer", () => {
+  test("a reviewer who votes twice is counted once, by their latest word", () => {
+    const rows = dedupLatestPerReviewer([
+      vote("R1", "reject", "2026-09-09T10:00:00.000Z"),
+      vote("R1", "approve", "2026-09-09T11:00:00.000Z"),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.decision).toBe("approve");
+  });
+
+  test("out-of-order arrival still keeps the newest", () => {
+    const rows = dedupLatestPerReviewer([
+      vote("R1", "approve", "2026-09-09T11:00:00.000Z"),
+      vote("R1", "reject", "2026-09-09T10:00:00.000Z"),
+    ]);
+    expect(rows[0]!.decision).toBe("approve");
+  });
+});
+
+// §16: a declined candidate was shown an Accept button. The aggregation carries
+// no suggested rate on this path, so accepting fell back to the contributor's own
+// asking rate and hired them at it. The outcome is never persisted — only the
+// rate, summary and commitment are — so the verdict is recomputed from the
+// feedback rows, and must agree with aggregateFeedback exactly.
+describe("unanimouslyRejected", () => {
+  test("every reviewer rejected", () => {
+    expect(unanimouslyRejected([feedback("R1", "reject"), feedback("R2", "reject")])).toBe(true);
+  });
+
+  test("a lone reviewer rejecting still counts", () => {
+    expect(unanimouslyRejected([feedback("R1", "reject")])).toBe(true);
+  });
+
+  test("one approval among rejections is not unanimous — that is a mixed outcome", () => {
+    expect(unanimouslyRejected([feedback("R1", "reject"), feedback("R2", "approve")])).toBe(false);
+  });
+
+  test("a counter is not a rejection — it is an offer to keep negotiating", () => {
+    expect(unanimouslyRejected([feedback("R1", "reject"), feedback("R2", "counter")])).toBe(false);
+  });
+
+  test("all approvals are obviously not a rejection", () => {
+    expect(unanimouslyRejected([feedback("R1", "approve"), feedback("R2", "approve")])).toBe(false);
+  });
+
+  // Silence is not a verdict (D-011). Nobody has declined anything yet, so there
+  // is nothing to refuse — and refusing here would strand a candidate whose
+  // review simply has not closed.
+  test("no responses is not a rejection", () => {
+    expect(unanimouslyRejected([])).toBe(false);
+  });
+
+  test("a reviewer who rejected then changed their mind is not counted as rejecting", () => {
+    expect(
+      unanimouslyRejected([
+        vote("R1", "reject", "2026-09-09T10:00:00.000Z"),
+        vote("R1", "approve", "2026-09-09T11:00:00.000Z"),
+      ])
+    ).toBe(false);
+  });
+
+  test("a reviewer who approved then rejected is counted as rejecting", () => {
+    expect(
+      unanimouslyRejected([
+        vote("R1", "approve", "2026-09-09T10:00:00.000Z"),
+        vote("R1", "reject", "2026-09-09T11:00:00.000Z"),
+      ])
+    ).toBe(true);
+  });
+
+  // Deliberately NOT pool-filtered, matching aggregateFeedback. If an out-of-pool
+  // approval were dropped here, aggregation would build a counter-offer while the
+  // guard refused the candidate permission to accept it.
+  test("a responder outside the pool still counts, as it does in aggregation", () => {
+    expect(unanimouslyRejected([feedback("R1", "reject"), feedback("stranger", "approve")])).toBe(
       false
     );
   });

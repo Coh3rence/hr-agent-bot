@@ -1,6 +1,8 @@
 import type { BotContext } from "../bot";
 import type { Agreement, Contributor } from "../models/types";
 import { buildModifyContext } from "../services/modify-context";
+import { unanimouslyRejected } from "../services/quorum";
+import { closeAsDeclined, COOLDOWN_DAYS } from "../services/decline";
 
 /**
  * Candidate-facing resolution of a reviewed proposal (D-010).
@@ -40,6 +42,8 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
   ctx.session.selectedOpportunityId = agreement.opportunityId;
 
   if (action === "accept") {
+    if (await refuseIfDeclined(ctx, agreementId)) return;
+
     // "Accept" means accept the reviewers' COUNTER, not the contributor's original
     // ask. Reconcile the agreement's terms to the aggregated suggestion before we
     // bridge to Collabberry, otherwise the backend agreement would be created with
@@ -201,22 +205,11 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
         "You can update your rate, commitment %, or duration."
     );
   } else if (action === "walkaway") {
-    await ctx.sheets.updateAgreementStatus(agreementId, "rejected");
-
-    const contributor = await ctx.sheets.getContributorById(agreement.contributorId);
-    if (contributor) {
-      const cooldownUntil = new Date();
-      cooldownUntil.setDate(cooldownUntil.getDate() + 3);
-
-      await ctx.sheets.updateContributor(contributor.id, {
-        status: "cooldown",
-        cooldownUntil: cooldownUntil.toISOString(),
-        previousAttempts: contributor.previousAttempts + 1,
-      });
-    }
+    await closeAsDeclined(agreementId, agreement.contributorId, ctx.sheets);
 
     await ctx.reply(
-      "Thank you for your time. We understand this wasn't the right fit. You're welcome to re-apply after a 3-day reflection period. We'll keep your profile on file."
+      "Thank you for your time. We understand this wasn't the right fit. You're welcome to re-apply " +
+        `after a ${COOLDOWN_DAYS}-day reflection period. We'll keep your profile on file.`
     );
 
     resetSession(ctx);
@@ -242,6 +235,31 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
  * 400, making this belt-and-suspenders). On-chain signing/minting is a separate
  * manual admin action.
  */
+/**
+ * Refuse an Accept on a proposal every reviewer declined. Returns true when the
+ * tap was refused.
+ *
+ * A declined candidate is no longer shown an Accept button, but hiding a button
+ * is not disabling it: callback data is replayable, so an Accept from an earlier
+ * round — or from a message sent before this guard existed — stays tappable in
+ * the chat forever. Unguarded, that tap took the normal approval path, and
+ * because a declined aggregation carries no suggested rate, the reconciliation
+ * fell back to the contributor's own asking rate and hired them at it.
+ *
+ * Also covers the round-cap branch, which offers its own "Accept offer" button.
+ */
+export async function refuseIfDeclined(ctx: BotContext, agreementId: string): Promise<boolean> {
+  const feedbacks = await ctx.sheets.getReviewFeedbacks(agreementId);
+  if (!unanimouslyRejected(feedbacks)) return false;
+
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  await ctx.reply(
+    "The reviewers declined this proposal, so it can't be accepted. " +
+      `You're welcome to apply again after a ${COOLDOWN_DAYS}-day reflection period.`
+  );
+  return true;
+}
+
 async function createBetaAgreement(
   ctx: BotContext,
   agreement: Agreement,

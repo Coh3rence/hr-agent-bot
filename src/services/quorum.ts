@@ -19,6 +19,45 @@ export function respondedReviewerIds(feedbacks: ReviewerFeedback[]): Set<string>
   return new Set(feedbacks.map((f) => f.reviewerId).filter((id) => id));
 }
 
+/**
+ * One row per reviewer, keeping their most recent submission — a reviewer who
+ * votes twice gets their latest word counted, not both.
+ *
+ * Lives here rather than in claude.ts because two independent decisions now rest
+ * on it: how feedback is aggregated, and whether a candidate may accept (§16). If
+ * they deduped differently the offer shown to the candidate and the guard on the
+ * Accept button could disagree about the same review.
+ */
+export function dedupLatestPerReviewer(feedbacks: ReviewerFeedback[]): ReviewerFeedback[] {
+  const latest = new Map<string, ReviewerFeedback>();
+  for (const f of feedbacks) {
+    const existing = latest.get(f.reviewerId);
+    if (!existing || f.submittedAt > existing.submittedAt) {
+      latest.set(f.reviewerId, f);
+    }
+  }
+  return [...latest.values()];
+}
+
+/**
+ * True when every reviewer who responded rejected the proposal — the `all_reject`
+ * outcome, recomputed from the feedback rows.
+ *
+ * Recomputed rather than read back because the outcome is never persisted:
+ * `updateAgreementAggregation` writes only the rate, the summary and the
+ * commitment. This must therefore mirror `aggregateFeedback` exactly, including
+ * its lack of a pool filter — an out-of-pool responder makes the aggregation
+ * `mixed`, so it must not be silently dropped here or the candidate could be
+ * shown a counter-offer they are then refused permission to accept.
+ *
+ * No responses is not a rejection: nobody has declined anything yet.
+ */
+export function unanimouslyRejected(feedbacks: ReviewerFeedback[]): boolean {
+  const unique = dedupLatestPerReviewer(feedbacks);
+  if (unique.length === 0) return false;
+  return unique.every((f) => f.decision === "reject");
+}
+
 /** Notified reviewers who have not yet submitted any feedback. */
 export function outstandingReviewers(
   recipientIds: string[],

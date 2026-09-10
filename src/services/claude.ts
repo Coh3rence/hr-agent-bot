@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
+import { dedupLatestPerReviewer } from "./quorum";
 import type { Env } from "../config";
 import type {
   Contributor,
@@ -268,17 +269,6 @@ Return matches sorted by overallScore descending.`;
       aggregationSig: sig,
     };
   }
-}
-
-function dedupLatestPerReviewer(feedbacks: ReviewerFeedback[]): ReviewerFeedback[] {
-  const latest = new Map<string, ReviewerFeedback>();
-  for (const f of feedbacks) {
-    const existing = latest.get(f.reviewerId);
-    if (!existing || f.submittedAt > existing.submittedAt) {
-      latest.set(f.reviewerId, f);
-    }
-  }
-  return [...latest.values()];
 }
 
 /** Mean (rounded) of the given numeric field across counters that supplied it, else null. */
