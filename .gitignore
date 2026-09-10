@@ -47,3 +47,10 @@ BACKLOG.md
 
 # Persisted conversation sessions (local dev)
 .sessions/
+
+# Local scratch scripts — one-off probes, superseded by scripts/
+_*_tmp.ts
+
+# Sheet snapshots taken before a destructive reset. Kept locally as a
+# rollback anchor; they hold contributor names, telegram ids and wallets.
+backups/
