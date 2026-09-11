@@ -317,8 +317,22 @@ running.
 5. **Escalation routing** — testable in ~1h instead of 48 by lowering `REVIEWER_TIMEOUT_HOURS` for
    a single run. Expect the escalation DM to reach reviewers, the candidate to receive nothing, and
    the proposal to move to `escalated`. Restore the timeout afterwards.
+6. **Reviewers disagreeing — the flow the client asked about.** One approves, one counters with the
+   rate written mid-sentence ("It's above our budget, can we reduce it to $40?"), a third stays
+   silent. Expect: quorum reached at 2 of 3 *without* the third, both opinions synthesised into one
+   counter-offer, the counter rate captured as `40` in Agreements column M, and the prose in column
+   N agreeing with it. On accept, the agreement must be created at **40**, not at the original ask.
 
-Scenarios 1–3 are the failures actually observed this week.
+Scenarios 1–3 are the failures actually observed this week. Scenario 6 is the one with the most
+client attention and, until now, the least ability to be tested: it needs a **3-person pool** so
+that a majority can close a review while one reviewer dissents or abstains. With the 2-person pool
+that existed previously, quorum equalled unanimity and the case was logically unrunnable.
+
+Scenario 6 is also the direct regression test for §11. That defect was found *inside* this exact
+flow on `a_1788808260898` — the reviewer's "$40" was dropped, aggregation had no number to average,
+and acceptance would have silently created the agreement at the original $50. Prose and stored
+terms disagreeing is the worst-looking failure in the product, and it lives in the client's
+favourite feature.
 
 ---
 
