@@ -119,18 +119,24 @@ working volume from the silent `.sessions` fallback.
 Still unproven: that a conversation survives a restart (scenario 4 below). The boot line proves the
 path, not the round trip.
 
-### 5.2 The three stale rows must be closed by hand
+### 5.2 The three stale rows — CLOSED 2026-09-11
 
 Deploying does not clean up history. `ensureOpenForReview` refuses a tap only when the proposal is
-no longer `under_review` — and `a_1788808260898` and `a_1788858438270` still are. **Their reviewer
-buttons in Aleksa's and Simon's chats remain answerable after the deploy.** A tap today would
-quietly record a verdict on a settled proposal.
+no longer `under_review` — and `a_1788808260898` and `a_1788858438270` still were. Their reviewer
+buttons in Aleksa's and Simon's chats stayed answerable after the deploy; a tap would have quietly
+recorded a verdict on a settled proposal.
 
-Checked 2026-09-10: they are otherwise inert. The timeout sweep skips them because both are already
+Checked 2026-09-10: they were otherwise inert. The timeout sweep skips them because both are already
 aggregated and the candidate was already notified (`timeout.ts:53`), so no escalation or
-re-notification is pending. The live buttons are the only exposure.
+re-notification was pending. The live buttons were the only exposure.
 
-Action: mark all three `superseded` in the sheet, then confirm by tapping an old button.
+**Done 2026-09-11.** All three (`a_1788808260898`, `a_1788858346291`, `a_1788858438270`) written to
+`superseded` via `SheetsService.updateAgreementStatus`, i.e. the same path the bot writes through.
+Re-read afterwards to confirm. The real agreement `a_1788962327012` was explicitly excluded and
+remains `approved` with `betaAppAgreementId 231b0916-…`.
+
+Outstanding, needs a human: tap one of the old buttons and confirm the refusal reads *"This proposal
+is no longer open for review…"*. That is the half the sheet write cannot prove.
 
 ### 5.3 Pushing does not deploy — the two are unrelated here
 
@@ -147,6 +153,31 @@ Verify a deploy by its build timestamp, never by the state of `origin/main`.
 The round-limit, unanimous-rejection and stale-button scenarios all need two reviewers responding,
 so they cannot be run solo — reviewer time has to be booked, not improvised. The quorum arithmetic
 also shifts with pool size, so confirm the pool before interpreting a result.
+
+**Pool as it actually stands, read 2026-09-11.** `AuthorizedUsers` holds three rows and **all three
+are `admin`**: `535329585` (Aleksa), `302836662` (the client), `1971913512` (unidentified — worth
+confirming who this is before a client-witnessed run). The contributor-role rows referenced in
+earlier notes (`383220557`, `298220926`) are gone.
+
+Since there is no separate reviewer role — `getAdminIds` serves both the review pool and the
+admin-command gate — the pool is those three minus whoever is the candidate:
+
+| Candidate | Pool | Quorum (`floor(n/2)+1`) | Consequence |
+|---|---|---|---|
+| A 4th, non-admin account | 3 | 2 | **Majority, as designed.** One silent reviewer cannot stall it. |
+| Any of the three admins | 2 | 2 | Unanimity by accident — "majority not unanimity" becomes unrunnable and one silent reviewer stalls until the 48h escalation. |
+
+**So the candidate must be a fourth Telegram account, authorised as Contributor — not Admin.** A new
+account is not a contributor by default: it hits the gate, every admin is DM'd, and the *Authorize
+as Contributor* button is the correct one. Tapping *Authorize as Admin* puts the candidate in the
+review pool and collapses the arithmetic to the second row above.
+
+Using a fresh account also removes the need to reset Gustavo's record — he is `hired`
+(`c_1788807562702`) and can simply be left alone.
+
+One more trap, previously observed: **anyone new must press Start at the bot before they can
+receive anything.** Telegram silently drops bot→user messages to a user who has never opened the
+chat, so an un-started reviewer stalls quorum invisibly rather than erroring.
 
 ### 5.5 The Anthropic key was out of credit — CLEARED 2026-09-11T13:19Z
 
@@ -299,8 +330,10 @@ Scenarios 1–3 are the failures actually observed this week.
 4. ~~Push the pending commits and deploy. Confirm the new build is live.~~ Done 2026-09-11 — build
    `839978aa`, clean boot, no 409.
 5. ~~Fund the Anthropic key (§5.5).~~ Done 2026-09-11T13:19Z — all six health checks pass.
-6. Mark the three stale rows `superseded`; verify an old button is now refused.
-7. Prepare a test candidate outside the review pool.
+6. ~~Mark the three stale rows `superseded`.~~ Done 2026-09-11 (§5.2). Still to do: tap an old
+   button and confirm the refusal.
+7. Prepare a test candidate outside the review pool — a **fourth** Telegram account, authorised as
+   Contributor. See the pool table in §5.4; using an existing admin collapses quorum to unanimity.
 8. Run live scenarios 1–5.
 9. Fill the 32 functional results in `QA-VERIFICATION.md` and regenerate the HTML and PDF.
 10. ~~Update `KNOWN-ISSUES-AND-DECISIONS.md` status labels with live evidence as each lands.~~
