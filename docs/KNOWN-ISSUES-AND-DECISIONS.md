@@ -421,3 +421,26 @@ still accepted).
   sends the user a plain "I'm having trouble right now, please try again shortly" instead of
   nothing. A dead LLM should degrade loudly, not silently. Related to §9 (no per-message logging) —
   with neither, an outage is invisible from both sides.
+
+**RESOLVED 2026-09-11T13:19Z.** Credits purchased; `health-check.ts` now returns
+`PASS anthropic api key 200` with all six checks green. The silent-failure hardening above is
+still unbuilt — the underlying fragility remains, it simply is not currently triggered.
+
+### 18. The model is env-overridable; QA runs on Haiku — DESIGN DECISION (2026-09-11)
+
+- Both Claude calls previously hardcoded `claude-sonnet-4-5-20250929`, so reducing spend for a test
+  run meant editing source and redeploying. The model now comes from `ANTHROPIC_MODEL`
+  (`src/config.ts`), read once in the `ClaudeService` constructor.
+- **Default remains Sonnet, deliberately.** The two jobs carry different risk. `extractStructured`
+  is forced tool-use against a fixed schema and tolerates a smaller model. `aggregateFeedback` is
+  judgement work — synthesising several reviewers into one counter-offer is what the client called
+  *"intersubjective aggregation"* and named as the product's differentiator. A quiet quality drop
+  there would be a drop in the thing being sold.
+- **Production is currently set to `claude-haiku-4-5-20251001`** to keep the cost of the live QA
+  scenarios down. Verified live the same day: production resolves the model and returns a reply, so
+  the id is valid — worth checking explicitly, because an invalid model id would fail through the
+  same silent path as §17 and look identical to the bot being dead.
+
+> **Restore before any client-witnessed run.** Unset `ANTHROPIC_MODEL` on the Railway `bot` service
+> (or set it back to `claude-sonnet-4-5-20250929`) and redeploy. Judge output quality only on
+> Sonnet; Haiku is for exercising the plumbing, not for assessing the aggregation copy.

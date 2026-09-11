@@ -22,10 +22,13 @@ had never previously been proven end to end.
 defects were observed. The session volume was attached in the same change, so §10 is active rather
 than inert. The deploy/repair gap that dominated this document is closed.
 
-**A new blocker took its place the same hour.** The production Anthropic key is out of credit, and
-because `claude.ts` has no error handling the bot replies with nothing at all — see §5.5 and
-`KNOWN-ISSUES-AND-DECISIONS.md` §17. The code in production is current; the service is not usable
-until the key is funded.
+**A blocker appeared and was cleared the same day.** The production Anthropic key was out of
+credit, which — because `claude.ts` has no error handling — made the bot reply with nothing at all
+rather than an error (`KNOWN-ISSUES` §17). Credits were purchased at 13:19Z and all six health
+checks now pass. The silent-failure fragility itself is still unfixed; it is simply not triggered.
+
+**Production is deliberately running Haiku 4.5 for the QA scenarios** (`KNOWN-ISSUES` §18) and must
+be returned to Sonnet before any client-witnessed run.
 
 ---
 
@@ -145,17 +148,18 @@ The round-limit, unanimous-rejection and stale-button scenarios all need two rev
 so they cannot be run solo — reviewer time has to be booked, not improvised. The quorum arithmetic
 also shifts with pool size, so confirm the pool before interpreting a result.
 
-### 5.5 The Anthropic key is out of credit — nothing else can be tested until it is funded
+### 5.5 The Anthropic key was out of credit — CLEARED 2026-09-11T13:19Z
 
 Found by `scripts/health-check.ts` at 2026-09-11T12:30Z, minutes after the deploy: the production
-key returns `400 — Your credit balance is too low`. Confirmed to be the production key and not a
+key returned `400 — Your credit balance is too low`. Confirmed to be the production key and not a
 local one by comparing fingerprints under `railway run` (`eb2f7cd5…`) against local (`afc43b46…`).
 
-Because `claude.ts` has no error handling, the rejection reaches `bot.ts:148` and is only logged —
-the user is sent **nothing**. Full detail in `KNOWN-ISSUES-AND-DECISIONS.md` §17.
+Because `claude.ts` has no error handling, the rejection reached `bot.ts:148` and was only logged —
+the user was sent **nothing**. Full detail in `KNOWN-ISSUES-AND-DECISIONS.md` §17.
 
-This gates every live scenario in §8, all of which begin with a discovery conversation. Fixing it
-is an account action, not a code change.
+Credits purchased; all six health checks now pass. **The fragility is not fixed** — any future API
+failure (rate limit, invalid model id, expired key) will still present as silence. Worth an hour to
+wrap the calls; it is the difference between a diagnosable outage and a mystery.
 
 ---
 
@@ -294,8 +298,7 @@ Scenarios 1–3 are the failures actually observed this week.
 3. ~~Add the Railway volume and set `SESSION_DIR`.~~ Done 2026-09-11 — `bot-volume` at `/data`.
 4. ~~Push the pending commits and deploy. Confirm the new build is live.~~ Done 2026-09-11 — build
    `839978aa`, clean boot, no 409.
-5. **Fund the Anthropic key (§5.5).** Blocks every item below it; nothing LLM-backed responds until
-   this is done.
+5. ~~Fund the Anthropic key (§5.5).~~ Done 2026-09-11T13:19Z — all six health checks pass.
 6. Mark the three stale rows `superseded`; verify an old button is now refused.
 7. Prepare a test candidate outside the review pool.
 8. Run live scenarios 1–5.
@@ -304,6 +307,8 @@ Scenarios 1–3 are the failures actually observed this week.
     §10, §11, §14, §15 and §16 moved to DEPLOYED on 2026-09-11; §17 opened for the Anthropic key.
     Still to do for the live scenarios as they land.
 11. Raise §7.1 and §7.2 with the client; agreement `231b0916-…` is the concrete example.
-12. Clear the untracked scratch files before handover.
+12. **Restore `ANTHROPIC_MODEL` to Sonnet before any client-witnessed run** (`KNOWN-ISSUES` §18).
+13. Clear the untracked scratch files before handover.
 
-Step 5 is the gate: steps 6–9 all need a working LLM.
+The deploy and credit gates are both cleared — steps 6–9 are now runnable. Step 6 is the cheapest
+and needs nobody else; step 8 is the one that needs reviewer time booked.
