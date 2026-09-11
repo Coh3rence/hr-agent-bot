@@ -3,6 +3,11 @@ import { z } from "zod";
 const envSchema = z.object({
   BOT_TOKEN: z.string().min(1, "Telegram bot token is required"),
   ANTHROPIC_API_KEY: z.string().min(1, "Anthropic API key is required"),
+  // Model behind both Claude calls. Env-overridable so a QA run can use a cheaper
+  // model without a code edit. Keep the default on Sonnet: extraction is forced
+  // tool-use and tolerates a smaller model, but reviewer aggregation is judgement
+  // work the client treats as the product's differentiator.
+  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
   GOOGLE_SHEETS_ID: z.string().min(1, "Google Sheets ID is required"),
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email("Valid service account email required"),
   GOOGLE_PRIVATE_KEY: z.string().min(1, "Google service account private key is required"),

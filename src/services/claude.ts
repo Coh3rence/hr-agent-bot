@@ -12,9 +12,11 @@ import type {
 
 export class ClaudeService {
   private client: Anthropic;
+  private model: string;
 
   constructor(config: Env) {
     this.client = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
+    this.model = config.ANTHROPIC_MODEL;
   }
 
   async chat(
@@ -22,7 +24,7 @@ export class ClaudeService {
     messages: { role: "user" | "assistant"; content: string }[]
   ): Promise<string> {
     const response = await this.client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: this.model,
       max_tokens: 1024,
       system: systemPrompt,
       messages,
@@ -39,7 +41,7 @@ export class ClaudeService {
     toolSchema: Record<string, unknown>
   ): Promise<T | null> {
     const response = await this.client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: this.model,
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
