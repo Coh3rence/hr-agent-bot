@@ -18,8 +18,9 @@ signup → agreement created. This included the invite-token → signup → agre
 had never previously been proven end to end.
 
 **None of the fixes from this QA run are live.** The running Railway build is from
-`2026-09-07T17:53:55Z`. Eight commits sit on `main` locally, unpushed. Production therefore still
-behaves exactly as it did while the defects were being observed.
+`2026-09-07T17:53:55Z`. All commits were pushed to `origin/main` on 2026-09-11 (`cee3cfb`), but
+see §5.3 — **pushing does not deploy this project.** Production still behaves exactly as it did
+while the defects were being observed.
 
 That gap — diagnosis and repair done, nothing deployed — is the single most important fact about the
 current state.
@@ -105,6 +106,10 @@ The session fix is committed but **inert without storage**. Requires a volume mo
 the bot service and `SESSION_DIR=/data/sessions`. Deploying without it changes nothing about
 conversations being wiped on restart.
 
+Confirmed absent 2026-09-11: the only volume in the project is `mysql-volume` on the MySQL service,
+and `SESSION_DIR` is not among the bot's variables. Best done *before* the deploy, so production
+restarts once rather than twice.
+
 ### 5.2 The three stale rows must be closed by hand
 
 Deploying does not clean up history. `ensureOpenForReview` refuses a tap only when the proposal is
@@ -117,6 +122,22 @@ aggregated and the candidate was already notified (`timeout.ts:53`), so no escal
 re-notification is pending. The live buttons are the only exposure.
 
 Action: mark all three `superseded` in the sheet, then confirm by tapping an old button.
+
+### 5.3 Pushing does not deploy — the two are unrelated here
+
+The Railway bot service has **no GitHub repo or branch attached**; its latest deployment carries no
+commit metadata. It was deployed by uploading source from a developer machine, so a `git push`
+changes nothing in production. Deploying is a separate, deliberate CLI action against the
+`collabberry-hr-agent` project, `production` environment, `bot` service.
+
+Recorded because the failure mode is silent and plausible: push, see green, assume the fix is live.
+Verify a deploy by its build timestamp, never by the state of `origin/main`.
+
+### 5.4 Two live tests need a second reviewer
+
+The round-limit, unanimous-rejection and stale-button scenarios all need two reviewers responding,
+so they cannot be run solo — reviewer time has to be booked, not improvised. The quorum arithmetic
+also shifts with pool size, so confirm the pool before interpreting a result.
 
 ---
 
