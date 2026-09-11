@@ -1,4 +1,4 @@
-# State of Play — 2026-09-10
+# State of Play — 2026-09-11
 
 **Project:** HR AI Agent for Collabberry
 **Purpose:** what is built, what is live, what remains. Written after the 2026-09-07..09 QA run
@@ -17,13 +17,15 @@ matching → negotiation → multi-reviewer review → aggregation → candidate
 signup → agreement created. This included the invite-token → signup → agreement-creation leg, which
 had never previously been proven end to end.
 
-**None of the fixes from this QA run are live.** The running Railway build is from
-`2026-09-07T17:53:55Z`. All commits were pushed to `origin/main` on 2026-09-11 (`cee3cfb`), but
-see §5.3 — **pushing does not deploy this project.** Production still behaves exactly as it did
-while the defects were being observed.
+**All fixes from this QA run went live on 2026-09-11.** Build `839978aa`
+(`2026-09-11T12:28:30Z`) replaced the `2026-09-07T17:53:55Z` build that was running while the
+defects were observed. The session volume was attached in the same change, so §10 is active rather
+than inert. The deploy/repair gap that dominated this document is closed.
 
-That gap — diagnosis and repair done, nothing deployed — is the single most important fact about the
-current state.
+**A new blocker took its place the same hour.** The production Anthropic key is out of credit, and
+because `claude.ts` has no error handling the bot replies with nothing at all — see §5.5 and
+`KNOWN-ISSUES-AND-DECISIONS.md` §17. The code in production is current; the service is not usable
+until the key is funded.
 
 ---
 
@@ -51,9 +53,9 @@ likelihood. The reviewer DMs for them were indistinguishable except by position 
 
 ---
 
-## 3. Built and verified, awaiting deploy
+## 3. Built, verified and deployed
 
-Verified present in source on 2026-09-10.
+Verified present in source on 2026-09-10; shipped to production 2026-09-11 in build `839978aa`.
 
 | Issue | Fix | Where |
 |---|---|---|
@@ -100,15 +102,19 @@ This is an unimplemented requirement rather than a defect. It does not block the
 
 ## 5. Not code, but blocking
 
-### 5.1 Railway disk
+### 5.1 Railway disk — DONE 2026-09-11
 
-The session fix is committed but **inert without storage**. Requires a volume mounted at `/data` on
-the bot service and `SESSION_DIR=/data/sessions`. Deploying without it changes nothing about
-conversations being wiped on restart.
+The session fix was committed but **inert without storage**: a volume at `/data` on the bot service
+plus `SESSION_DIR=/data/sessions`. Both were absent when checked on 2026-09-11 — the only volume in
+the project was `mysql-volume` on MySQL.
 
-Confirmed absent 2026-09-11: the only volume in the project is `mysql-volume` on the MySQL service,
-and `SESSION_DIR` is not among the bot's variables. Best done *before* the deploy, so production
-restarts once rather than twice.
+Resolved before the deploy, so production restarted once rather than twice: volume `bot-volume`
+created on the `bot` service at `/data`, `SESSION_DIR=/data/sessions` set. The boot log of build
+`839978aa` reads `Sessions persisted to /data/sessions`, which is the line that distinguishes a
+working volume from the silent `.sessions` fallback.
+
+Still unproven: that a conversation survives a restart (scenario 4 below). The boot line proves the
+path, not the round trip.
 
 ### 5.2 The three stale rows must be closed by hand
 
@@ -138,6 +144,18 @@ Verify a deploy by its build timestamp, never by the state of `origin/main`.
 The round-limit, unanimous-rejection and stale-button scenarios all need two reviewers responding,
 so they cannot be run solo — reviewer time has to be booked, not improvised. The quorum arithmetic
 also shifts with pool size, so confirm the pool before interpreting a result.
+
+### 5.5 The Anthropic key is out of credit — nothing else can be tested until it is funded
+
+Found by `scripts/health-check.ts` at 2026-09-11T12:30Z, minutes after the deploy: the production
+key returns `400 — Your credit balance is too low`. Confirmed to be the production key and not a
+local one by comparing fingerprints under `railway run` (`eb2f7cd5…`) against local (`afc43b46…`).
+
+Because `claude.ts` has no error handling, the rejection reaches `bot.ts:148` and is only logged —
+the user is sent **nothing**. Full detail in `KNOWN-ISSUES-AND-DECISIONS.md` §17.
+
+This gates every live scenario in §8, all of which begin with a discovery conversation. Fixing it
+is an account action, not a code change.
 
 ---
 
@@ -273,14 +291,19 @@ Scenarios 1–3 are the failures actually observed this week.
 
 1. ~~Build §16 (routing all-reject into the existing walk-away behaviour) with unit tests.~~ Done 2026-09-10.
 2. ~~Build §15 (filter the candidate out of both admin broadcasts) with unit tests.~~ Done 2026-09-10.
-3. Add the Railway volume and set `SESSION_DIR`.
-4. Push the pending commits and deploy. Confirm the new build is live.
-5. Mark the three stale rows `superseded`; verify an old button is now refused.
-6. Prepare a test candidate outside the review pool.
-7. Run live scenarios 1–5.
-8. Fill the 32 functional results in `QA-VERIFICATION.md` and regenerate the HTML and PDF.
-9. Update `KNOWN-ISSUES-AND-DECISIONS.md` status labels with live evidence as each lands.
-10. Raise §7.1 and §7.2 with the client; agreement `231b0916-…` is the concrete example.
-11. Clear the untracked scratch files before handover.
+3. ~~Add the Railway volume and set `SESSION_DIR`.~~ Done 2026-09-11 — `bot-volume` at `/data`.
+4. ~~Push the pending commits and deploy. Confirm the new build is live.~~ Done 2026-09-11 — build
+   `839978aa`, clean boot, no 409.
+5. **Fund the Anthropic key (§5.5).** Blocks every item below it; nothing LLM-backed responds until
+   this is done.
+6. Mark the three stale rows `superseded`; verify an old button is now refused.
+7. Prepare a test candidate outside the review pool.
+8. Run live scenarios 1–5.
+9. Fill the 32 functional results in `QA-VERIFICATION.md` and regenerate the HTML and PDF.
+10. ~~Update `KNOWN-ISSUES-AND-DECISIONS.md` status labels with live evidence as each lands.~~
+    §10, §11, §14, §15 and §16 moved to DEPLOYED on 2026-09-11; §17 opened for the Anthropic key.
+    Still to do for the live scenarios as they land.
+11. Raise §7.1 and §7.2 with the client; agreement `231b0916-…` is the concrete example.
+12. Clear the untracked scratch files before handover.
 
-Items 1–2 are unblocked: both design decisions are answered in §6.
+Step 5 is the gate: steps 6–9 all need a working LLM.

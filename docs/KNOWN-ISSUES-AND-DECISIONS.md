@@ -126,7 +126,7 @@ but it is the kind of mismatch that quietly pays someone 2x.
 - **Fix idea:** add structured logging around phase transitions and Beta App calls
   (submit, review decision, resolve, createAgreement) for production support/observability.
 
-### 10. Conversation state is in-memory only — lost on every restart — FIXED IN CODE, AWAITING DEPLOY
+### 10. Conversation state is in-memory only — lost on every restart — DEPLOYED (2026-09-11)
 - `src/bot.ts` installs grammy's `session()` with no storage adapter, so all conversation state
   (phase, message history, in-flight agreement/review ids) lives in process memory.
 - Any restart — deploy, crash, or the Telegram 409 `getUpdates` conflict / Railway restart cycle —
@@ -136,7 +136,7 @@ but it is the kind of mismatch that quietly pays someone 2x.
   same info 10x" after the bot restarted several times behind a 409.
 - **Operational workaround:** never `railway up` mid-session; confirm the log tail has no recent 409
   before a witnessed run.
-**FIXED IN CODE, AWAITING DEPLOY (2026-09-08).** `session()` is backed by `@grammyjs/storage-file`
+**FIXED IN CODE 2026-09-08.** `session()` is backed by `@grammyjs/storage-file`
 writing to `SESSION_DIR`, plus a message-history cap (`SESSION_HISTORY_LIMIT`) and a 7-day expiry
 sweep on the existing scheduler. See §12 for why file-backed rather than Redis, and the deploy note
 below.
@@ -146,7 +146,15 @@ below.
 > fixes. The deploy MUST attach a volume at `/data` and set `SESSION_DIR=/data/sessions`. The
 > resolved path is logged on boot so a misconfiguration is visible rather than silent.
 
-### 11. Reviewer counter rate is only parsed from a LEADING number — FIXED IN CODE, AWAITING DEPLOY
+**DEPLOYED 2026-09-11.** Prerequisite satisfied in the same change: Railway volume `bot-volume`
+created on the `bot` service at mount path `/data`, and `SESSION_DIR=/data/sessions` set. Build
+`839978aa` (2026-09-11T12:28:30Z) booted clean and logged `Sessions persisted to /data/sessions`
+— the boot line above confirming the volume took, rather than the silent `.sessions` fallback.
+
+Not yet proven live: that a conversation actually survives a restart (scenario 4). The boot line
+proves the path is right, not that state is re-read on the other side of a restart.
+
+### 11. Reviewer counter rate is only parsed from a LEADING number — DEPLOYED (2026-09-11)
 - `parseCounterFeedback` (`src/conversations/review.ts`) matches the rate with `/^\s*\$?(\d+...)/`,
   so it is captured only when the reviewer's message *begins* with the number. The prompt does ask
   the reviewer to "start with the number", but reviewers write naturally.
@@ -213,7 +221,7 @@ below.
   change in `FIX-PLAN-DEF10-SESSION-PERSISTENCE.md`, and out of MVP scope. The Sheet is deliberate
   for the MVP so the client can inspect state directly (QA document §5).
 
-### 14. Renegotiating orphans the previous agreement — FIXED IN CODE, AWAITING DEPLOY
+### 14. Renegotiating orphans the previous agreement — DEPLOYED (2026-09-11)
 - `review:modify:` (`src/conversations/review.ts:29`) only sets `phase = "negotiation"` and replies.
   It never touches the agreement the contributor is walking away from, and `negotiation.ts:123`
   then inserts a **new** row. Nothing marks the old one superseded.
@@ -290,7 +298,7 @@ still bites) and `ensureOpenForReview` (open / superseded / decided / draft / mi
 
 ---
 
-### 15. Admin broadcasts are not filtered against the candidate — FIXED IN CODE, AWAITING DEPLOY
+### 15. Admin broadcasts are not filtered against the candidate — DEPLOYED (2026-09-11)
 
 `reviewRecipients` correctly excludes a contributor from reviewing their own proposal, but the two
 admin *broadcast* paths do not apply that filter — both DM everyone `getAdminIds()` returns:
@@ -328,7 +336,7 @@ against the filtered pool) and the `notifyAdminsOfWriteFailure` block in
 
 ---
 
-### 16. A unanimously rejected candidate can hire themselves — FIXED IN CODE, AWAITING DEPLOY
+### 16. A unanimously rejected candidate can hire themselves — DEPLOYED (2026-09-11)
 
 `presentToCandidate` (`services/presentation.ts`) builds its keyboard **unconditionally** — Accept /
 Modify Terms / Walk away — and never branches on `CounterOffer.outcome`. `handleResolution`'s
@@ -386,3 +394,30 @@ absence of a pool filter), `services/presentation.test.ts` (no keyboard, no rate
 closed and cooled down; mixed/counter/all-approve/no-feedback still get the three buttons) and
 `conversations/resolution.test.ts` (a replayed Accept is refused; every non-unanimous verdict is
 still accepted).
+
+### 17. Production Anthropic key is out of credit — the bot answers nothing — PRODUCTION BLOCKER (2026-09-11)
+
+- **Observed live 2026-09-11T12:30Z**, immediately after the deploy of build `839978aa`.
+  `scripts/health-check.ts`, run as `railway run --service bot` so it reads the injected production
+  environment, returned:
+  `FAIL anthropic api key 400 — Your credit balance is too low to access the Anthropic API.`
+  Every other check passed: backend `auth/nonce` 200, frontend root and `/member-sign-up` 200,
+  backend org roster 200, Telegram identity `@Coh3erence_hr_bot` (8811416846).
+- **This is the production key, not a local one.** Bun auto-loads `.env`, so the check could in
+  principle have tested the developer key. Ruled out by fingerprint: SHA-256 prefix of the key seen
+  under `railway run` is `eb2f7cd5da5e`, versus `afc43b46c136` locally. Railway's injected variable
+  takes precedence, so the failing key is the one the deployed bot uses.
+- **Why it is worse than an error message.** `src/services/claude.ts` contains no `try`/`catch`, so
+  the SDK rejection propagates to the global handler at `src/bot.ts:148`, which only does
+  `console.error`. Nothing is sent to the user. A contributor messaging the bot gets **silence**,
+  not an apology — indistinguishable from the bot being down.
+- **Blast radius: every LLM-backed step.** Discovery extraction, matching narration, negotiation
+  handling and review aggregation all route through `claude.ts`. Non-LLM paths (sheet reads, button
+  callbacks) still work, so the bot will look partly alive, which makes the failure harder to read
+  from the outside.
+- **Action required from the client/owner:** top up the Anthropic account or set a funded
+  `ANTHROPIC_API_KEY` on the Railway `bot` service. No code change is needed to restore service.
+- **Hardening worth doing regardless (not yet built):** wrap the Claude calls so an API failure
+  sends the user a plain "I'm having trouble right now, please try again shortly" instead of
+  nothing. A dead LLM should degrade loudly, not silently. Related to §9 (no per-message logging) —
+  with neither, an outage is invisible from both sides.
