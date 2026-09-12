@@ -44,6 +44,10 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   makes the handler fail closed. That guard now exists (§19 of KNOWN-ISSUES),
   but deletion remains the cleaner cleanup since it removes the test data too.
   Any later re-run creates a fresh `a_qa6_*` id that must be cleaned the same way.
+- **STILL TO CLEAN (2026-09-12):** `a_qa6_1789226741319` (split approve/reject —
+  §19 verification) and `a_qa6_1789226816573` (counter at $60 — §11 regression).
+  Both left in place so the candidate-side buttons can be tapped by hand; run
+  `bun _qa6clean_tmp.ts <id>` on each when done.
 
 ### R4. Local scratch scripts
 - `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_keycheck_tmp.ts`,

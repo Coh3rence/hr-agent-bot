@@ -33,10 +33,16 @@ be returned to Sonnet before any client-witnessed run.
 **2026-09-12 — the reviewer-disagreement scenario was run and found a new defect.** Rather than
 wait on a second human reviewer, the responses are now written straight into `ReviewFeedback`
 while the real quorum arithmetic, real Claude aggregation, real sheet and real candidate DM all
-run on top (see §5.4). The first run exposed `KNOWN-ISSUES` §19: **a reviewer who objects without
-naming a figure left the candidate holding an Accept button that would hire them at their own
-asking rate.** Fixed in code the same day, not yet deployed. Every production change made during
-this QA work is itemised with its undo in `QA-REVERT-LEDGER.md`.
+run on top (see §5.4). The first run exposed `KNOWN-ISSUES` §19: **when one reviewer approves and
+another rejects, the candidate was left holding an Accept button that would hire them at their own
+asking rate** — above the advertised band, with a rejection on record. Fixed in code the same day,
+not yet deployed. Every production change made during this QA work is itemised with its undo in
+`QA-REVERT-LEDGER.md`.
+
+Worth noting how that was found, because it cuts both ways: the harness initially wrote a reviewer
+row the bot itself would have refused, and the resulting write-up named the wrong trigger. Routing
+the harness through the same parser a real tap uses corrected it — and the defect turned out to be
+reachable by an ordinary split verdict, which is exactly the flow the client asked about.
 
 ---
 

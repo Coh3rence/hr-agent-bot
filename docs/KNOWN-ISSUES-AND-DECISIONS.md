@@ -445,14 +445,25 @@ still unbuilt — the underlying fragility remains, it simply is not currently t
 > (or set it back to `claude-sonnet-4-5-20250929`) and redeploy. Judge output quality only on
 > Sonnet; Haiku is for exercising the plumbing, not for assessing the aggregation copy.
 
-### 19. A counter with no parseable rate lets the candidate accept at their own ask — FIXED IN CODE, AWAITING DEPLOY (2026-09-12)
+### 19. A split approve/reject verdict lets the candidate accept at their own ask — FIXED IN CODE, AWAITING DEPLOY (2026-09-12)
 
-Same family as §11 and §16, but a different link in the chain. §11 fixed *extraction* — a
-reviewer's counter rate is now recovered from anywhere in their message, not just a leading
-number. This is about what happens when there is genuinely **no number to recover**.
+Same family as §16, but reached from the opposite direction. §16 closed the case where *every*
+reviewer declined. This is the case where they **disagree** — and it was the more likely of the
+two to happen in practice.
 
-A reviewer who taps **Counter** and writes *"too expensive for this scope, please bring it
-down"* produces `suggestedRate: null` — there is nothing to parse. From there:
+> **Correction, same day.** This was first written up as "a reviewer counters without naming a
+> number". **That premise is wrong** — `collectReviewerFeedback` already refuses a numberless
+> counter and asks the reviewer to resend (`src/conversations/review.ts:196`), so a `counter` row
+> always carries a rate or a commitment. The state was reached here only because the QA harness
+> wrote the row directly and bypassed that guard.
+>
+> The defect is nonetheless real, by a different and more ordinary route: **one reviewer approves,
+> another rejects, and nobody counters.** `meanOfCounters` averages only rows with
+> `decision === "counter"`, so with no counters it returns `null` for both rate and commitment,
+> while the verdict is `mixed` rather than `all_reject`. That is the plainest possible split
+> decision — and the "dispute between the admins" flow the client asked about.
+
+**The reachable trigger:** a split approve/reject with no counter-offer. From there:
 
 1. `aggregateForAgreement` returns a `CounterOffer` with `suggestedRate: null`.
 2. `presentToCandidate` renders *"The reviewers did not propose a rate."* — and still offers
@@ -465,26 +476,20 @@ pushed back on approves it at the full asking rate, and bridges that to Collabbe
 candidate is not doing anything wrong — it is the only affirmative button on screen.
 
 **Live evidence, 2026-09-12.** Seeded `a_qa6_1789223297207` at $75/hr against `opp_002`
-(band $45–70) with one approve and one counter carrying `suggestedRate: null`. Aggregation
-returned:
+(band $45–70). Aggregation returned:
 
 ```json
 { "suggestedRate": null, "suggestedCommitment": null, "outcome": "mixed", "reviewerCount": 2 }
 ```
 
-The summary prose named $60, so the model *read* the intent — it simply has no channel to
-return it, because the rate is carried in a separate structured field the aggregation does
-not populate from prose. Tapping Accept would have recorded $75.
+The candidate DM read *"The reviewers did not propose a rate"* and carried an **Accept** button.
+Tapping it would have recorded $75 — $5 above the top of the advertised band — and bridged that
+to Collabberry.
 
-**Two independent gaps, worth fixing separately:**
-
-- **No second line of defence.** Rate recovery happens only at ingest
-  (`parseCounterFeedback`). `aggregateFeedback` already has the reviewer text in front of it
-  and could return a rate when the structured field is empty.
-- **Accept is offered when there is nothing to accept.** When a `mixed`/`counter` outcome
-  carries no rate, the honest options are *Modify Terms* and *Walk away* — the same reasoning
-  §16 applied to a unanimous rejection. An Accept button whose only possible meaning is
-  "approve my own asking rate" should not be rendered.
+**The gap: Accept is offered when there is nothing to accept.** When a `mixed` outcome carries
+neither a rate nor a commitment, the honest options are *Modify Terms* and *Walk away* — the same
+reasoning §16 applied to a unanimous rejection. An Accept button whose only possible meaning is
+"approve my own asking rate" should not be rendered.
 
 Noted while confirming: the accept path had **no `under_review` status guard**.
 `refuseIfDeclined` blocks only the unanimous-rejection case, so a stale Accept button on a
@@ -511,9 +516,38 @@ ever errors.
 Covered by 9 new tests (`presentation.test.ts`, `resolution.test.ts`), including the all-approve
 carve-out and the `linked` exemption. Suite: 105 pass.
 
-**The first gap above is deliberately left open.** Teaching `aggregateFeedback` to recover a rate
-from prose would reduce friction — a reviewer writing "can we do 60/hr" (no `$`, mid-sentence) is
-missed by `parseCounterFeedback`'s regex and currently costs a renegotiation round. It is no longer
-a *correctness* risk now that Accept is suppressed: the worst case is an extra round, not a wrong
-hire. It also changes LLM-dependent behaviour and so needs its own verification pass rather than
-riding along with a safety fix.
+**Deliberately left open: a rejection carries no terms into the aggregate.** A reviewer who
+rejects is asked for "what would need to change", and that prose is summarised for the candidate,
+but no rate is ever parsed from it — `parseCounterFeedback` runs only on `counter`. So a reject
+saying "fine at $50" cannot move the offer to $50; the candidate has to re-enter negotiation and
+propose it themselves. That is now a friction cost rather than a correctness risk, and changing it
+means deciding whether a rejection may set terms at all — a product question for the client, not a
+patch.
+
+### 20. Aggregated reviewer copy is sent to the candidate unvalidated — OPEN (2026-09-12)
+
+`aggregateForAgreement` takes whatever `claude.aggregateFeedback` returns as `qualitativeSummary`
+and `presentToCandidate` puts it in the DM verbatim. Nothing between the model and the candidate
+checks it. Two things surfaced in the 2026-09-12 runs:
+
+**An unfilled placeholder reached candidate-facing copy.** The split-verdict run
+(`a_qa6_1789226741319`) produced:
+
+> "We'd encourage you to consider gaining additional targeted experience in **[relevant area]** and
+> welcome you to reapply in the future…"
+
+A literal `[relevant area]` would have been sent to a real person.
+
+**The tone contradicted the buttons.** That same summary reads as a rejection — *"reapply in the
+future"* — on a `mixed` verdict where the product's intent is to keep negotiating, and where the
+message underneath now offers *Modify Terms*. The candidate is told to go away and invited to
+continue in the same breath.
+
+Both were produced on **Haiku** (§18), so this is not evidence about the model that ships, and the
+counter-offer run on the same day (`a_qa6_1789226816573`) returned clean, on-message copy. The
+structural point stands regardless of model: there is no floor under what reaches the candidate.
+A cheap guard would be to reject a summary containing bracketed placeholders and fall back to the
+deterministic phrasing the all-reject path already uses, rather than trusting every generation.
+
+Re-check on Sonnet before deciding how much to build — and treat this as a reason to hold the
+restore to Sonnet (§18, ledger R1) as a release gate rather than a nicety.
