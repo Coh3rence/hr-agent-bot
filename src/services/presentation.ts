@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import type { SheetsService } from "./sheets";
-import { unanimouslyRejected } from "./quorum";
+import { unanimouslyApproved, unanimouslyRejected } from "./quorum";
 import { closeAsDeclined, COOLDOWN_DAYS } from "./decline";
 
 /**
@@ -71,6 +71,37 @@ export async function presentToCandidate(
     // After marking, so a failed send retries the DM rather than re-incrementing
     // the contributor's attempt count.
     await closeAsDeclined(agreementId, agreement.contributorId, sheets);
+    return true;
+  }
+
+  // Reviewers objected but named no figure, so there is no counter-offer to
+  // accept — and the accept path reconciles with `offer.suggestedRate ??
+  // agreement.hourlyRate`, meaning "Accept" could only ever have meant "approve
+  // my own asking rate", the very rate that was just objected to (§19). A
+  // reviewer writing "too expensive, please bring it down" leaves no number to
+  // parse, so this is reachable without anyone behaving unusually. Renegotiating
+  // is the honest next step, so those are the only two options offered.
+  if (
+    offer.suggestedRate == null &&
+    offer.suggestedCommitment == null &&
+    !unanimouslyApproved(feedbacks)
+  ) {
+    const message =
+      `Your proposal has been reviewed.\n\n` +
+      `Role: ${agreement.roleName}\n\n` +
+      `${offer.qualitativeSummary}\n\n` +
+      `The reviewers haven't put specific numbers on the table, so there's no revised ` +
+      `offer for you to accept yet. Would you like to revise your terms?`;
+
+    const keyboard = new InlineKeyboard()
+      .text("Modify Terms", `resolution:modify:${agreementId}`)
+      .row()
+      .text("Walk away", `resolution:walkaway:${agreementId}`);
+
+    await notifier.sendMessage(Number(contributor.telegramId), message, {
+      reply_markup: keyboard,
+    });
+    await sheets.markCandidateNotified(agreementId);
     return true;
   }
 

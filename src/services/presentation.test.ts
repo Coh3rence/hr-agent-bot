@@ -133,6 +133,35 @@ describe("presentToCandidate — an offer still on the table", () => {
     expect(h.statusWrites).toEqual([]);
   });
 
+  // §19: a counter carrying no figure ("too expensive, bring it down") left the
+  // offer with a null rate, and the accept path falls back to the candidate's own
+  // asking rate — so Accept meant "hire me at the rate you just objected to".
+  test("reviewers who objected without naming a figure get no Accept button", async () => {
+    const h = harness([feedback("R1", "approve"), feedback("R2", "counter")], null);
+    expect(await presentToCandidate("a_1", h.sheets, h.notifier)).toBe(true);
+    const labels = h.sent[0]!.keyboard!.inline_keyboard.flat().map((b) => b.text);
+    expect(labels).toEqual(["Modify Terms", "Walk away"]);
+    expect(labels).not.toContain("Accept");
+  });
+
+  test("the candidate is told there is nothing to accept, not given a bare rate line", async () => {
+    const h = harness([feedback("R1", "reject"), feedback("R2", "counter")], null);
+    await presentToCandidate("a_1", h.sheets, h.notifier);
+    expect(h.sent[0]!.text).toContain("no revised offer for you to accept");
+    expect(h.sent[0]!.text).not.toContain("did not propose a rate");
+    expect(h.statusWrites).toEqual([]);
+  });
+
+  // The carve-out that keeps the fix from breaking the happy path: on an
+  // all-approve a missing rate means nobody wanted a change, so the candidate's
+  // own terms are exactly what was approved and accepting them is correct.
+  test("an all-approve with no rate on the row still offers Accept", async () => {
+    const h = harness([feedback("R1", "approve"), feedback("R2", "approve")], null);
+    await presentToCandidate("a_1", h.sheets, h.notifier);
+    const labels = h.sent[0]!.keyboard!.inline_keyboard.flat().map((b) => b.text);
+    expect(labels).toEqual(["Accept", "Modify Terms", "Walk away"]);
+  });
+
   test("the candidate is DM'd exactly once across both triggers", async () => {
     const h = harness([feedback("R1", "approve")]);
     expect(await presentToCandidate("a_1", h.sheets, h.notifier)).toBe(true);

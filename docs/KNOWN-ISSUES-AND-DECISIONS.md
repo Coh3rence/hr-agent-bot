@@ -444,3 +444,76 @@ still unbuilt — the underlying fragility remains, it simply is not currently t
 > **Restore before any client-witnessed run.** Unset `ANTHROPIC_MODEL` on the Railway `bot` service
 > (or set it back to `claude-sonnet-4-5-20250929`) and redeploy. Judge output quality only on
 > Sonnet; Haiku is for exercising the plumbing, not for assessing the aggregation copy.
+
+### 19. A counter with no parseable rate lets the candidate accept at their own ask — FIXED IN CODE, AWAITING DEPLOY (2026-09-12)
+
+Same family as §11 and §16, but a different link in the chain. §11 fixed *extraction* — a
+reviewer's counter rate is now recovered from anywhere in their message, not just a leading
+number. This is about what happens when there is genuinely **no number to recover**.
+
+A reviewer who taps **Counter** and writes *"too expensive for this scope, please bring it
+down"* produces `suggestedRate: null` — there is nothing to parse. From there:
+
+1. `aggregateForAgreement` returns a `CounterOffer` with `suggestedRate: null`.
+2. `presentToCandidate` renders *"The reviewers did not propose a rate."* — and still offers
+   the **Accept** button (`src/services/presentation.ts:77-97`).
+3. `handleResolution` accept reconciles with
+   `offer.suggestedRate ?? agreement.hourlyRate` (`src/conversations/resolution.ts:54`).
+
+The fallback is the candidate's **own original ask**. So "Accept" on a proposal the reviewers
+pushed back on approves it at the full asking rate, and bridges that to Collabberry. The
+candidate is not doing anything wrong — it is the only affirmative button on screen.
+
+**Live evidence, 2026-09-12.** Seeded `a_qa6_1789223297207` at $75/hr against `opp_002`
+(band $45–70) with one approve and one counter carrying `suggestedRate: null`. Aggregation
+returned:
+
+```json
+{ "suggestedRate": null, "suggestedCommitment": null, "outcome": "mixed", "reviewerCount": 2 }
+```
+
+The summary prose named $60, so the model *read* the intent — it simply has no channel to
+return it, because the rate is carried in a separate structured field the aggregation does
+not populate from prose. Tapping Accept would have recorded $75.
+
+**Two independent gaps, worth fixing separately:**
+
+- **No second line of defence.** Rate recovery happens only at ingest
+  (`parseCounterFeedback`). `aggregateFeedback` already has the reviewer text in front of it
+  and could return a rate when the structured field is empty.
+- **Accept is offered when there is nothing to accept.** When a `mixed`/`counter` outcome
+  carries no rate, the honest options are *Modify Terms* and *Walk away* — the same reasoning
+  §16 applied to a unanimous rejection. An Accept button whose only possible meaning is
+  "approve my own asking rate" should not be rendered.
+
+Noted while confirming: the accept path had **no `under_review` status guard**.
+`refuseIfDeclined` blocks only the unanimous-rejection case, so a stale Accept button on a
+`superseded` agreement was still actionable — the reviewer side got this guard in §14
+(`ensureOpenForReview`), the candidate side did not.
+
+**FIX (2026-09-12).** Both the button and the guard, since either alone leaves a hole — hiding a
+keyboard does not disable it, and guarding without hiding shows the candidate a button that only
+ever errors.
+
+- `presentToCandidate` no longer renders **Accept** when the offer carries neither a rate nor a
+  commitment *and* the reviewers did not unanimously approve. The candidate is told plainly that
+  no revised offer is on the table and is offered *Modify Terms* / *Walk away*
+  (`src/services/presentation.ts`).
+- `unanimouslyApproved` added beside `unanimouslyRejected` (`src/services/quorum.ts`) to separate
+  the two reasons a rate can be absent. **This carve-out is the load-bearing part:** on an
+  all-approve, a missing rate means nobody wanted a change, so the candidate's own terms *are*
+  what was approved and Accept must still appear. Suppressing on `rate == null` alone would have
+  blocked legitimate hires.
+- `handleResolution` now refuses `accept` / `modify` / `walkaway` unless the row is still
+  `under_review` (`src/conversations/resolution.ts`). `linked` is exempt by design: it runs after
+  `accept` has already moved the row to `approved` and is the continuation of that decision.
+
+Covered by 9 new tests (`presentation.test.ts`, `resolution.test.ts`), including the all-approve
+carve-out and the `linked` exemption. Suite: 105 pass.
+
+**The first gap above is deliberately left open.** Teaching `aggregateFeedback` to recover a rate
+from prose would reduce friction — a reviewer writing "can we do 60/hr" (no `$`, mid-sentence) is
+missed by `parseCounterFeedback`'s regex and currently costs a renegotiation round. It is no longer
+a *correctness* risk now that Accept is suppressed: the worst case is an extra round, not a wrong
+hire. It also changes LLM-dependent behaviour and so needs its own verification pass rather than
+riding along with a safety fix.

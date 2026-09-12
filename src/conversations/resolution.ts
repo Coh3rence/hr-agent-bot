@@ -35,6 +35,26 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     return;
   }
 
+  // Hiding a keyboard is not disabling it: callback data stays replayable in the
+  // chat forever, so an Accept from a round the candidate has already left —
+  // superseded by their own revision, or already resolved — was still filed as a
+  // fresh decision (§19). The reviewer side got this guard in §14
+  // (`ensureOpenForReview`); this is its candidate-side mirror.
+  //
+  // `linked` is deliberately exempt: it runs after `accept` has already moved the
+  // row to `approved`, and is the continuation of that same decision.
+  if (action === "accept" || action === "modify" || action === "walkaway") {
+    if (agreement.status !== "under_review") {
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+      await ctx.reply(
+        "That button belongs to an earlier version of this proposal, which has since been " +
+          "settled or replaced. If there's anything still waiting on you, it'll have arrived " +
+          "as a newer message."
+      );
+      return;
+    }
+  }
+
   // Rehydrate so the branch logic (and any re-entered negotiation) works even if
   // this is a cold session that has lost the in-memory negotiation context.
   ctx.session.currentAgreementId = agreementId;

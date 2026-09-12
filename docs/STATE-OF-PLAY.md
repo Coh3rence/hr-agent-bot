@@ -30,6 +30,14 @@ checks now pass. The silent-failure fragility itself is still unfixed; it is sim
 **Production is deliberately running Haiku 4.5 for the QA scenarios** (`KNOWN-ISSUES` §18) and must
 be returned to Sonnet before any client-witnessed run.
 
+**2026-09-12 — the reviewer-disagreement scenario was run and found a new defect.** Rather than
+wait on a second human reviewer, the responses are now written straight into `ReviewFeedback`
+while the real quorum arithmetic, real Claude aggregation, real sheet and real candidate DM all
+run on top (see §5.4). The first run exposed `KNOWN-ISSUES` §19: **a reviewer who objects without
+naming a figure left the candidate holding an Accept button that would hire them at their own
+asking rate.** Fixed in code the same day, not yet deployed. Every production change made during
+this QA work is itemised with its undo in `QA-REVERT-LEDGER.md`.
+
 ---
 
 ## 2. Production evidence from the QA run
@@ -148,16 +156,25 @@ changes nothing in production. Deploying is a separate, deliberate CLI action ag
 Recorded because the failure mode is silent and plausible: push, see green, assume the fix is live.
 Verify a deploy by its build timestamp, never by the state of `origin/main`.
 
-### 5.4 Two live tests need a second reviewer
+### 5.4 The second-reviewer dependency — SOLVED 2026-09-12
 
-The round-limit, unanimous-rejection and stale-button scenarios all need two reviewers responding,
-so they cannot be run solo — reviewer time has to be booked, not improvised. The quorum arithmetic
-also shifts with pool size, so confirm the pool before interpreting a result.
+Several scenarios (round limit, unanimous rejection, stale buttons, reviewer disagreement) need two
+reviewers responding, which previously meant booking someone else's time and waiting.
 
-**Pool as it actually stands, read 2026-09-11.** `AuthorizedUsers` holds three rows and **all three
-are `admin`**: `535329585` (Aleksa), `302836662` (the client), `1971913512` (unidentified — worth
-confirming who this is before a client-witnessed run). The contributor-role rows referenced in
-earlier notes (`383220557`, `298220926`) are gone.
+**They no longer do.** A reviewer's tap is mechanically nothing more than one `ReviewFeedback` row,
+and every decision downstream re-reads that tab, so the responses can be written directly
+(`_qa6_tmp.ts`). Everything of interest still executes for real: the quorum arithmetic, the Claude
+aggregation, the sheet writes and the candidate DM. Only the reviewer's thumb is simulated.
+
+This matters for a second reason. The pool contains **real people** — the client among them — and
+the `review:submit:` tap is the only code path that DMs them. Seeding the proposal at
+`under_review` skips that path entirely, so a test run cannot send the client a review request for
+fabricated data. No change to `AuthorizedUsers` was needed.
+
+**Pool as it actually stands, read 2026-09-12.** `AuthorizedUsers` holds three rows and **all three
+are `admin`**: `535329585` (Aleksa), `302836662` (Gustavo — the client), `1971913512` (**Simon** —
+identified from his `ReviewFeedback` history; a genuine reviewer, not stale test data). The
+contributor-role rows referenced in earlier notes (`383220557`, `298220926`) are gone.
 
 Since there is no separate reviewer role — `getAdminIds` serves both the review pool and the
 admin-command gate — the pool is those three minus whoever is the candidate:
@@ -167,13 +184,19 @@ admin-command gate — the pool is those three minus whoever is the candidate:
 | A 4th, non-admin account | 3 | 2 | **Majority, as designed.** One silent reviewer cannot stall it. |
 | Any of the three admins | 2 | 2 | Unanimity by accident — "majority not unanimity" becomes unrunnable and one silent reviewer stalls until the 48h escalation. |
 
-**So the candidate must be a fourth Telegram account, authorised as Contributor — not Admin.** A new
-account is not a contributor by default: it hits the gate, every admin is DM'd, and the *Authorize
-as Contributor* button is the correct one. Tapping *Authorize as Admin* puts the candidate in the
-review pool and collapses the arithmetic to the second row above.
+**The runs done on 2026-09-12 use Aleksa (`535329585`) as the candidate**, which puts them on the
+second row: pool `302836662` + `1971913512`, quorum 2. That is fine for disagreement and
+counter-offer scenarios, where the point is a *split* verdict and both reviewers respond anyway.
+It cannot demonstrate "majority, not unanimity" (QA cases E4/E5) — that genuinely needs a fourth
+account so the pool reaches 3 and a third reviewer can stay silent without stalling.
 
-Using a fresh account also removes the need to reset Gustavo's record — he is `hired`
-(`c_1788807562702`) and can simply be left alone.
+`selfReviewAllowed()` requires **both** `NODE_ENV=development` and `ALLOW_SELF_REVIEW=true`, so in
+production the candidate is always excluded from their own pool. Verified live 2026-09-12.
+
+For a real fourth account: it is not a contributor by default — it hits the gate, every admin is
+DM'd, and *Authorize as Contributor* is the correct button. Tapping *Authorize as Admin* puts the
+candidate in the review pool and collapses the arithmetic to the second row above. A fresh account
+also avoids touching Gustavo's record — he is `hired` (`c_1788807562702`) and can be left alone.
 
 One more trap, previously observed: **anyone new must press Start at the bot before they can
 receive anything.** Telegram silently drops bot→user messages to a user who has never opened the

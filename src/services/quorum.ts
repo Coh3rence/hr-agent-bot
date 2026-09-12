@@ -58,6 +58,24 @@ export function unanimouslyRejected(feedbacks: ReviewerFeedback[]): boolean {
   return unique.every((f) => f.decision === "reject");
 }
 
+/**
+ * True when every reviewer who responded approved — the `all_approve` outcome,
+ * recomputed from the feedback rows for the same reason `unanimouslyRejected` is.
+ *
+ * Exists to tell the two ways an offer can carry no suggested rate apart (§19).
+ * On an all-approve, the absent rate means nobody wanted to change anything, so
+ * the candidate's own terms are precisely what was approved. On any other
+ * outcome it means reviewers objected without naming a figure, and falling back
+ * to the candidate's terms would hire them at the rate just objected to.
+ *
+ * No responses is not an approval: nobody has agreed to anything yet.
+ */
+export function unanimouslyApproved(feedbacks: ReviewerFeedback[]): boolean {
+  const unique = dedupLatestPerReviewer(feedbacks);
+  if (unique.length === 0) return false;
+  return unique.every((f) => f.decision === "approve");
+}
+
 /** Notified reviewers who have not yet submitted any feedback. */
 export function outstandingReviewers(
   recipientIds: string[],
