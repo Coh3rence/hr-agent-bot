@@ -74,13 +74,15 @@ export async function presentToCandidate(
     return true;
   }
 
-  // Reviewers objected but named no figure, so there is no counter-offer to
+  // Reviewers disagreed but proposed no terms, so there is no counter-offer to
   // accept — and the accept path reconciles with `offer.suggestedRate ??
   // agreement.hourlyRate`, meaning "Accept" could only ever have meant "approve
-  // my own asking rate", the very rate that was just objected to (§19). A
-  // reviewer writing "too expensive, please bring it down" leaves no number to
-  // parse, so this is reachable without anyone behaving unusually. Renegotiating
-  // is the honest next step, so those are the only two options offered.
+  // my own asking rate", the very rate that was just objected to (§19).
+  //
+  // Reached by the plainest split verdict there is: one approve, one reject, no
+  // counters. `meanOfCounters` averages only `counter` rows, so it returns null
+  // for both dimensions while the outcome stays `mixed` rather than `all_reject`.
+  // Renegotiating is the honest next step, so those are the only options offered.
   if (
     offer.suggestedRate == null &&
     offer.suggestedCommitment == null &&
