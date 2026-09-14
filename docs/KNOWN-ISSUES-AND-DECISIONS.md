@@ -516,6 +516,26 @@ ever errors.
 Covered by 9 new tests (`presentation.test.ts`, `resolution.test.ts`), including the all-approve
 carve-out and the `linked` exemption. Suite: 105 pass.
 
+**Verified in production 2026-09-14**, on build `2026-09-14T09:08:50Z`, against candidate
+`535329585`:
+
+- *Accept suppressed on a split verdict.* The DM for `a_qa6_1789226741319` carries the new
+  "there's no revised offer for you to accept yet" wording and no Accept button. That sentence is
+  emitted only by the new branch, so its presence is itself proof the suppression fired.
+- *Reconciliation.* Accepting `a_qa6_1789226816573` moved `hourlyRate` `75` → **`60`** and the
+  status to `approved` — the candidate was hired at the reviewers' counter, not their own ask.
+- *Stale button refused.* Tapping Accept a second time on that same (now `approved`) message was
+  refused with the guard's wording, and wrote nothing: the `collabberryInviteToken` stayed
+  `87903afd-…`, which a second successful accept would have replaced with a freshly minted token.
+  That unchanged token is the evidence, not the reply text.
+- *Deleted rows fail closed.* Tapping Accept on the deleted first run (`a_qa6_1789223297207`)
+  produced "I couldn't find that agreement", logging `handleResolution: agreement … not found`.
+  This is what makes deletion a safe cleanup strategy for seeded QA rows (ledger R3).
+
+Reconstructing the above required diffing sheet cells and comparing invite tokens, because the
+bot logged exactly one line across the whole session — see §9. The absence of per-message logging
+is a live QA cost, not just a hardening nicety.
+
 **Deliberately left open: a rejection carries no terms into the aggregate.** A reviewer who
 rejects is asked for "what would need to change", and that prose is summarised for the candidate,
 but no rate is ever parsed from it — `parseCounterFeedback` runs only on `counter`. So a reject
