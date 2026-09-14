@@ -266,7 +266,7 @@ another indistinguishable pair of buttons.
   - `review.ts:29` (`review:modify:`, the pre-submission edit) leaves the counter untouched, which
     is correct — that edit happens before a round is consumed.
   Evidence: `a_1788858438270` is genuinely a second-round proposal and is recorded as round 1.
-**FIXED IN CODE, AWAITING DEPLOY (2026-09-08).** Four changes:
+**FIXED (2026-09-08), DEPLOYED 2026-09-14.** Four changes:
 
 1. **New terminal status `superseded`** (`models/types.ts`). Both renegotiation paths now retire the
    row they replace: `review:modify:` (pre-submission draft) and `resolution.ts` `action === "modify"`
@@ -445,7 +445,7 @@ still unbuilt — the underlying fragility remains, it simply is not currently t
 > (or set it back to `claude-sonnet-4-5-20250929`) and redeploy. Judge output quality only on
 > Sonnet; Haiku is for exercising the plumbing, not for assessing the aggregation copy.
 
-### 19. A split approve/reject verdict lets the candidate accept at their own ask — FIXED IN CODE, AWAITING DEPLOY (2026-09-12)
+### 19. A split approve/reject verdict lets the candidate accept at their own ask — FIXED (2026-09-12), DEPLOYED 2026-09-14
 
 Same family as §16, but reached from the opposite direction. §16 closed the case where *every*
 reviewer declined. This is the case where they **disagree** — and it was the more likely of the

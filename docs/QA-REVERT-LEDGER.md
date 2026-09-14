@@ -55,6 +55,12 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
 - Gitignored (`.gitignore` `_*_tmp.ts`), so they never reached the client repo.
 - **Revert:** `rm _*_tmp.ts` before handover.
+- **Trap — these scripts read whatever env they are given.** Local `.env` points at a
+  *different* spreadsheet than Railway. Run them plain (`bun _statecheck_tmp.ts`) and
+  you are inspecting the dev sheet; the production sheet is only reached via
+  `railway run --service bot bun _statecheck_tmp.ts`. Every QA row listed in R2/R3 was
+  written through `railway run`. Reading the dev sheet by mistake shows an almost-empty
+  database and invites the conclusion that production has been wiped.
 
 ---
 
@@ -74,6 +80,14 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   proposal from the 2026-09-09 run.
 - `a_1788962327012` (`approved`, beta app id `231b0916-…`) is the real
   outcome of that run and was deliberately left untouched.
+
+### K4. §19 fix deployed 2026-09-14
+- Commits `0feade5`, `4847862`, `8f3dde7` pushed to `main`, then `railway up --ci
+  --service bot`. Build `2026-09-14T09:08:50Z` (previous: `2026-09-11T13:28:33Z`).
+- **Note for anyone auditing what is live:** `railway up` uploads the *working
+  tree*, not a git ref. The deployed build is whatever was on disk at that moment,
+  which is why the older §14-family fix (dated 2026-09-08) also went live here.
+  Always confirm against the build timestamp, never against `git log`.
 
 ### K3. Code + docs shipped in `98a4cde`
 - `ANTHROPIC_MODEL` made env-overridable (`src/config.ts`), model lifted out of
