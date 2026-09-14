@@ -538,6 +538,23 @@ checks it. Two things surfaced in the 2026-09-12 runs:
 
 A literal `[relevant area]` would have been sent to a real person.
 
+**The copy asserted a rate the offer did not carry — the most serious of the three.** The first
+run (`a_qa6_1789223297207`, since deleted) had no aggregated rate at all, so the DM's own header
+said *"The reviewers did not propose a rate."* The prose underneath it said:
+
+> "Our current band for this position is **$60**, which represents fair compensation for the scope
+> and level we've defined. We'd like to move forward at this rate."
+
+There was no $60 anywhere in the feedback rows or in the structured offer — the model supplied it.
+Because that run predates §19, the message also carried an **Accept** button, and accepting would
+have reconciled to `offer.suggestedRate ?? agreement.hourlyRate` = the candidate's own **$75**.
+So the candidate reads $60, taps Accept, and is hired at $75. §19 removes the button on this
+verdict, which closes the money path; it does **not** stop the prose inventing a figure, and a
+number invented on a *counter* verdict would still be shown next to a different real rate.
+
+Evidence is the 2026-09-12 16:28 CEST DM to `535329585`, preserved in the QA transcript; the
+sheet row was deleted per ledger R3, so the DM is the only remaining copy.
+
 **The tone contradicted the buttons.** That same summary reads as a rejection — *"reapply in the
 future"* — on a `mixed` verdict where the product's intent is to keep negotiating, and where the
 message underneath now offers *Modify Terms*. The candidate is told to go away and invited to
