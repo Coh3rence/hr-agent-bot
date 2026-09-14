@@ -266,7 +266,7 @@ another indistinguishable pair of buttons.
   - `review.ts:29` (`review:modify:`, the pre-submission edit) leaves the counter untouched, which
     is correct — that edit happens before a round is consumed.
   Evidence: `a_1788858438270` is genuinely a second-round proposal and is recorded as round 1.
-**FIXED (2026-09-08), DEPLOYED 2026-09-14.** Four changes:
+**FIXED (2026-09-08), DEPLOYED 2026-09-11.** Four changes:
 
 1. **New terminal status `superseded`** (`models/types.ts`). Both renegotiation paths now retire the
    row they replace: `review:modify:` (pre-submission draft) and `resolution.ts` `action === "modify"`
