@@ -48,6 +48,25 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   §19 verification) and `a_qa6_1789226816573` (counter at $60 — §11 regression).
   Both left in place so the candidate-side buttons can be tapped by hand; run
   `bun _qa6clean_tmp.ts <id>` on each when done.
+- **Reminder:** `_qa6clean_tmp.ts` must be run through `railway run --service bot`,
+  or it will look for the rows in the dev sheet and find nothing. See the trap in R4.
+
+### R5. Side effects of the 2026-09-14 Accept tap
+Accepting `a_qa6_1789226816573` by hand (to verify §11 reconciliation) wrote three
+things beyond the agreement row:
+- **Agreement terms rewritten:** `hourlyRate` `75` → `60`, status `under_review` →
+  `approved`. This is the *correct* behaviour under test, not a defect.
+- **Contributor `c_qa_1789223297207` now holds `collabberryInviteToken`**
+  `87903afd-ee4c-4157-9d48-e7928709c159`. Was empty.
+- **A real, unredeemed invite exists in the Collabberry beta app** for that token —
+  created by `ctx.beta.createInviteLink()`, which calls the live backend.
+- **Revert:** deleting the contributor and agreement rows (R2/R3) clears the sheet
+  side. The beta-app invite is *not* removed by that and will linger unredeemed.
+  It was never signed up against, so no member or on-chain agreement was created —
+  the "I've signed up" tap was deliberately not performed.
+- **Why it was allowed to happen:** proving the candidate is hired at the reviewers'
+  rate rather than their own ask requires a genuine tap; no dry run exercises
+  `updateAgreementTerms`. Accepted cost, recorded rather than avoided.
 
 ### R4. Local scratch scripts
 - `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_keycheck_tmp.ts`,
