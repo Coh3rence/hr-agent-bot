@@ -151,8 +151,17 @@ created on the `bot` service at mount path `/data`, and `SESSION_DIR=/data/sessi
 `839978aa` (2026-09-11T12:28:30Z) booted clean and logged `Sessions persisted to /data/sessions`
 — the boot line above confirming the volume took, rather than the silent `.sessions` fallback.
 
-Not yet proven live: that a conversation actually survives a restart (scenario 4). The boot line
-proves the path is right, not that state is re-read on the other side of a restart.
+**PROVEN LIVE 2026-09-14.** Candidate `535329585` was mid-discovery — the bot had greeted them by
+name, echoed their stored profile and posted "Finding the best opportunities for you…" — when the
+`bot` service was deliberately restarted (`railway redeploy`, build `2026-09-14T14:28:21Z`,
+replacing `09:08:50Z`). The contributor then continued in the same thread and selected the
+Frontend Developer role; the bot carried on without re-asking anything or demanding `/start`.
+
+This is the half the 2026-09-11 deploy note called out as still unproven: state is genuinely
+re-read on the far side of a restart, not merely written to the right path. The restart was done
+for an unrelated reason (checking the configured model), which is why it happened mid-flow —
+worth keeping as the cheapest way to exercise this, since the scenario is awkward to stage
+deliberately.
 
 ### 11. Reviewer counter rate is only parsed from a LEADING number — DEPLOYED (2026-09-11)
 - `parseCounterFeedback` (`src/conversations/review.ts`) matches the rate with `/^\s*\$?(\d+...)/`,
