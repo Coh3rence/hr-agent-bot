@@ -9,6 +9,11 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
 
 ## REVERT — before any client-witnessed run
 
+> **Status 2026-09-22: R1, R2, R3 and R5 are all DONE.** Production config is back to its
+> pre-QA state and the client's sheet holds only real rows. Two residuals, neither blocking a
+> client run: **R4** (local scratch scripts, gitignored — delete at handover) and the
+> unredeemed beta-app invite noted under R5, which no script in this repo can remove.
+
 ### R1. `ANTHROPIC_MODEL` is overridden to Haiku — **DONE 2026-09-22**
 - **Set to:** `claude-haiku-4-5-20251001` on the Railway `bot` service.
 - **Was:** unset — the code default is `claude-sonnet-4-5-20250929` (`src/config.ts`).
@@ -25,12 +30,20 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   `railway run --service bot` prints `configured model: claude-sonnet-4-5-20250929` and gets
   a live reply back.
 
-### R2. Seeded QA contributor row
+### R2. Seeded QA contributor row — **DONE 2026-09-22**
 - **Added:** `Contributors` row `c_qa_1789223297207`, telegramId `535329585`,
   name `Aleksa (QA)`, status `active`.
 - **Revert:** delete the row. Nothing else references it once R3 is gone.
 - **Note:** `535329585` had no contributor row before this; deleting restores
   that. Do not touch `c_1788807562702` (Gustavo, `hired`, real).
+- **DONE 2026-09-22:** deleted via `_qacontribclean_tmp.ts`, which carries the same id guard
+  as `_qa6clean_tmp.ts` (refuses anything not `c_qa*`) plus one extra check — it refuses while
+  any agreement still references the contributor, so the R3 rows cannot be orphaned by doing
+  these in the wrong order. Row as deleted, for the record:
+  `c_qa_1789223297207 | 535329585 | aleksaprosperitylabs | Aleksa (QA) | React, TypeScript,
+  TailwindCSS, wagmi | 60 | 75 | 75 | CET | Serbia | active | | 0 | 2026-09-12T14:28:17.207Z |
+  (no wallet) | (no collabberryUserId) | inviteToken 87903afd-ee4c-4157-9d48-e7928709c159`.
+- `Contributors` is now a single row — `c_1788807562702` (Gustavo, `hired`), untouched.
 
 ### R3. Seeded QA agreement + simulated reviewer rows
 - **Added:** `Agreements` row `a_qa6_1789223297207` (opp_002, $75/hr, 60%,
@@ -55,6 +68,15 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   §19 verification) and `a_qa6_1789226816573` (counter at $60 — §11 regression).
   Both left in place so the candidate-side buttons can be tapped by hand; run
   `bun _qa6clean_tmp.ts <id>` on each when done.
+- **DONE 2026-09-22 — both cleaned.** `a_qa6_1789226741319` (1 agreement + 2 feedback rows) and
+  `a_qa6_1789226816573` (1 agreement + 2 feedback rows), 6 rows total. `a_qa6_1789226741319`
+  was the more important of the two to remove: it was still `under_review` and its stored
+  aggregation held the literal `[relevant area]` copy — the exact text §20's guard now refuses,
+  sitting in the client-visible record.
+- **Verified after:** `Agreements` back to its 4 real rows (`a_1788808260898`,
+  `a_1788858346291`, `a_1788858438270` superseded; `a_1788962327012` approved with beta app id
+  `231b0916-…`), `ReviewFeedback` back to its 6 real rows, and a grep for `qa6|c_qa_|QA-SIM`
+  across all three tabs returns 0.
 - **Reminder:** `_qa6clean_tmp.ts` must be run through `railway run --service bot`,
   or it will look for the rows in the dev sheet and find nothing. See the trap in R4.
 
@@ -71,6 +93,12 @@ things beyond the agreement row:
   side. The beta-app invite is *not* removed by that and will linger unredeemed.
   It was never signed up against, so no member or on-chain agreement was created —
   the "I've signed up" tap was deliberately not performed.
+- **SHEET SIDE DONE 2026-09-22** with R2/R3. **The beta-app invite is the one residual of the
+  whole QA effort:** token `87903afd-ee4c-4157-9d48-e7928709c159` still exists unredeemed in the
+  Collabberry backend, and nothing in this repo deletes it — it was created by a live
+  `createInviteLink()` call. It is inert (no member, no on-chain agreement, and the sheet row
+  that carried it is gone, so the bot can no longer surface it to anyone). Flag it to whoever
+  owns the beta app if unredeemed invites are ever audited.
 - **Why it was allowed to happen:** proving the candidate is hired at the reviewers'
   rate rather than their own ask requires a genuine tap; no dry run exercises
   `updateAgreementTerms`. Accepted cost, recorded rather than avoided.
@@ -78,7 +106,8 @@ things beyond the agreement row:
 ### R4. Local scratch scripts
 - `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_gate_tmp.ts`,
   `_guardwire_tmp.ts`, `_keycheck_tmp.ts`, `_modelcheck_tmp.ts`, `_proddump_tmp.ts`,
-  `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
+  `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_qacontribclean_tmp.ts`, `_statecheck_tmp.ts`,
+  `_supersede_tmp.ts`.
 - Gitignored (`.gitignore` `_*_tmp.ts`), so they never reached the client repo.
 - **Revert:** `rm _*_tmp.ts` before handover.
 - **Trap — these scripts read whatever env they are given.** Local `.env` points at a
