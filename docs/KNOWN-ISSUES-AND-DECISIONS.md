@@ -553,7 +553,7 @@ propose it themselves. That is now a friction cost rather than a correctness ris
 means deciding whether a rejection may set terms at all — a product question for the client, not a
 patch.
 
-### 20. Aggregated reviewer copy is sent to the candidate unvalidated — FIXED IN CODE, AWAITING DEPLOY (2026-09-15)
+### 20. Aggregated reviewer copy is sent to the candidate unvalidated — FIXED (2026-09-15), DEPLOYED 2026-09-22
 
 `aggregateForAgreement` takes whatever `claude.aggregateFeedback` returns as `qualitativeSummary`
 and `presentToCandidate` puts it in the DM verbatim. Nothing between the model and the candidate
@@ -627,3 +627,19 @@ continuing negotiation so the model must not tell the contributor to reapply. To
 deterministically checkable, so there is no floor under it the way there is under the other two —
 if the copy again reads as a rejection on a `mixed` verdict, that is a prompt problem to iterate
 on, and it is worth re-reading once production is back on Sonnet.
+
+**DEPLOYED 2026-09-22**, build `2026-09-22T06:48:13Z`, with `ANTHROPIC_MODEL` removed so the bot
+is back on Sonnet (ledger R1). The §18 release gate was then run against the live production
+configuration: both real 2026-09-12 inputs — the approve+reject at $75 that produced
+`[relevant area]`, and the approve+counter at $60 — synthesised three times each.
+
+- **6 of 6 clean.** No placeholder, no unsupported figure, no tone tell in any run.
+- **The guard fired 0 times**, which is the result that mattered. A guard that replaced decent
+  Sonnet copy with the blunt deterministic fallback would have been a downgrade disguised as a
+  fix; it stays out of the way and only the unit tests (which feed it the actual bad strings)
+  exercise the fallback.
+- **The third symptom is gone on Sonnet.** The prompt change holds: every run of the
+  approve+reject case invited the candidate to revise their terms rather than telling them to
+  reapply in future. Worth spot-checking again after any prompt edit, since nothing enforces it.
+- Case B cited `$75` and `$60` and nothing else — both supported figures (the candidate's own ask
+  and the reviewer's counter), so the guard correctly let them through.

@@ -9,7 +9,7 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
 
 ## REVERT — before any client-witnessed run
 
-### R1. `ANTHROPIC_MODEL` is overridden to Haiku
+### R1. `ANTHROPIC_MODEL` is overridden to Haiku — **DONE 2026-09-22**
 - **Set to:** `claude-haiku-4-5-20251001` on the Railway `bot` service.
 - **Was:** unset — the code default is `claude-sonnet-4-5-20250929` (`src/config.ts`).
 - **Why:** cut LLM spend during QA.
@@ -17,6 +17,13 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
   (or remove the variable to fall back to the default), then redeploy.
 - **Why it matters:** reviewer aggregation is the feature the client calls the
   product's differentiator. Do not demo it on Haiku.
+- **DONE 2026-09-22:** reverted by `railway variables delete ANTHROPIC_MODEL --service bot`,
+  i.e. restored to genuinely unset rather than pinned, so the live model is whatever
+  `src/config.ts` ships. The deployed model is therefore auditable from the repo instead of
+  from invisible platform config. Verified two ways, neither of them "a deploy happened":
+  the variable is absent from `railway variables --kv`, and `_modelcheck_tmp.ts` run under
+  `railway run --service bot` prints `configured model: claude-sonnet-4-5-20250929` and gets
+  a live reply back.
 
 ### R2. Seeded QA contributor row
 - **Added:** `Contributors` row `c_qa_1789223297207`, telegramId `535329585`,
@@ -69,9 +76,9 @@ things beyond the agreement row:
   `updateAgreementTerms`. Accepted cost, recorded rather than avoided.
 
 ### R4. Local scratch scripts
-- `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_keycheck_tmp.ts`,
-  `_modelcheck_tmp.ts`, `_proddump_tmp.ts`, `_qa6_tmp.ts`, `_qa6clean_tmp.ts`,
-  `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
+- `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_gate_tmp.ts`,
+  `_guardwire_tmp.ts`, `_keycheck_tmp.ts`, `_modelcheck_tmp.ts`, `_proddump_tmp.ts`,
+  `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
 - Gitignored (`.gitignore` `_*_tmp.ts`), so they never reached the client repo.
 - **Revert:** `rm _*_tmp.ts` before handover.
 - **Trap — these scripts read whatever env they are given.** Local `.env` points at a
@@ -112,6 +119,14 @@ things beyond the agreement row:
 - `ANTHROPIC_MODEL` made env-overridable (`src/config.ts`), model lifted out of
   the two hardcoded call sites (`src/services/claude.ts`), status docs updated.
 - The *code* stays. Only the production *value* is temporary — see R1.
+
+### K5. §20 summary guard deployed 2026-09-22
+- Commits `be4e20a` (guard + wiring + 14 tests), `ac8e8fc` (harness model id),
+  `1dddfbf` (docs), then `railway up --service bot --ci`.
+- Build **`2026-09-22T06:48:13Z`** (previous: `2026-09-14T14:28:21Z`). Boot log clean:
+  `Sessions persisted to /data/sessions` → `Starting HR Agent Bot...`, no trailing 409.
+- Same caveat as K4: `railway up` uploads the working tree, not a git ref. The tree was
+  clean at upload, so this build does correspond to `main` — but confirm by timestamp.
 
 ---
 
