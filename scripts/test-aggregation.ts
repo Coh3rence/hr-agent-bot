@@ -28,6 +28,11 @@ const sheetIdOverride = sheetIdIdx >= 0 ? process.argv[sheetIdIdx + 1] : null;
 const cfg = {
   BOT_TOKEN: "x",
   ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY!,
+  // ClaudeService has read the model off config since it became env-overridable
+  // (§18); this harness builds its config by hand, so without this line the model
+  // is undefined and every Claude-calling scenario fails at the API.
+  ANTHROPIC_MODEL:
+    process.env.ANTHROPIC_MODEL ?? env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5-20250929",
   GOOGLE_SHEETS_ID: sheetIdOverride ?? env.GOOGLE_SHEETS_ID!,
   GOOGLE_SERVICE_ACCOUNT_EMAIL: env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
   GOOGLE_PRIVATE_KEY: env.GOOGLE_PRIVATE_KEY!,
