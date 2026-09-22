@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import { dedupLatestPerReviewer } from "./quorum";
+import { findSummaryViolation, deterministicSummary } from "./summaryGuard";
 import type { Env } from "../config";
 import type {
   Contributor,
@@ -258,14 +259,29 @@ Return matches sorted by overallScore descending.`;
       .join("\n");
 
     const summary = await this.chat(
-      `You are an HR assistant synthesizing multiple reviewer opinions into a single concise counter-offer message for a contributor. Reflect the range of stances honestly, stay professional and constructive, and do not reveal individual reviewer identities. Respond in one paragraph.`,
+      `You are an HR assistant synthesizing multiple reviewer opinions into a single concise counter-offer message for a contributor. Reflect the range of stances honestly, stay professional and constructive, and do not reveal individual reviewer identities. Never state a rate or any other figure that does not appear in the feedback above. Never emit a placeholder in square or curly brackets. This is a continuing negotiation and the contributor will be invited to revise their terms, so do not close the door or suggest they reapply in future. Respond in one paragraph.`,
       [{ role: "user", content: `Synthesize:\n\n${feedbackText}` }]
     );
+
+    const supportedAmounts = [
+      originalRate,
+      meanRate,
+      ...unique.map((f) => f.suggestedRate),
+    ].filter((n): n is number => typeof n === "number");
+
+    let qualitativeSummary = summary;
+    const violation = findSummaryViolation(summary, supportedAmounts);
+    if (violation) {
+      console.warn(
+        `aggregateFeedback: model summary rejected (${violation}); using deterministic fallback`
+      );
+      qualitativeSummary = deterministicSummary(unique);
+    }
 
     return {
       suggestedRate: meanRate,
       suggestedCommitment: meanCommitment,
-      qualitativeSummary: summary,
+      qualitativeSummary,
       outcome: "mixed",
       reviewerCount: unique.length,
       aggregationSig: sig,
