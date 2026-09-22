@@ -553,7 +553,7 @@ propose it themselves. That is now a friction cost rather than a correctness ris
 means deciding whether a rejection may set terms at all — a product question for the client, not a
 patch.
 
-### 20. Aggregated reviewer copy is sent to the candidate unvalidated — OPEN (2026-09-12)
+### 20. Aggregated reviewer copy is sent to the candidate unvalidated — FIXED IN CODE, AWAITING DEPLOY (2026-09-15)
 
 `aggregateForAgreement` takes whatever `claude.aggregateFeedback` returns as `qualitativeSummary`
 and `presentToCandidate` puts it in the DM verbatim. Nothing between the model and the candidate
@@ -597,3 +597,33 @@ deterministic phrasing the all-reject path already uses, rather than trusting ev
 
 Re-check on Sonnet before deciding how much to build — and treat this as a reason to hold the
 restore to Sonnet (§18, ledger R1) as a release gate rather than a nicety.
+
+**FIXED IN CODE 2026-09-15.** `src/services/summaryGuard.ts`, applied in `claude.ts` at the one
+place a model writes candidate-facing prose freehand — the mixed-verdict branch of
+`aggregateFeedback`. The all-approve, all-reject and single-reviewer paths are deterministic
+already, and a lone reviewer's own words are authoritative, so none of them are touched.
+
+`findSummaryViolation` refuses a summary that:
+- contains a square- or curly-bracketed placeholder;
+- names a dollar figure — `$60` or a bare `60/hr` — that is not the aggregated rate, the
+  candidate's own ask, or some reviewer's counter;
+- is empty, which `chat()` returns whenever the response carries no text block.
+
+On refusal the copy falls back to `deterministicSummary`: the reviewers' own comments, which
+cannot invent a figure because no model generated them. The rejection is logged with its reason,
+so the guard firing is visible in the deploy logs rather than silent (§9).
+
+Because the guard sits inside `aggregateFeedback`, the sanitised text is what
+`updateAgreementAggregation` persists — the stored record and the DM cannot disagree.
+
+**Verified against the real production strings**, not only synthetic ones. The `[relevant area]`
+copy from `a_qa6_1789226741319` is refused; the invented-`$60` copy from the deleted first run is
+refused; the genuinely clean counter-offer from `a_qa6_1789226816573` passes untouched, which is
+the false-positive case that matters. 14 new tests, suite 119 pass.
+
+**The third symptom is handled at the prompt, not the guard.** The system prompt now forbids
+figures absent from the feedback, forbids bracketed placeholders, and states that this is a
+continuing negotiation so the model must not tell the contributor to reapply. Tone is not
+deterministically checkable, so there is no floor under it the way there is under the other two —
+if the copy again reads as a rejection on a `mixed` verdict, that is a prompt problem to iterate
+on, and it is worth re-reading once production is back on Sonnet.
