@@ -39,8 +39,12 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // First message after selecting opportunity
-  if (!ctx.session.currentAgreementId && !ctx.message?.text) {
+  // Entry from the opportunity keyboard: a callback query carries no message text,
+  // so there is nothing to extract yet. Gating this on currentAgreementId as well
+  // meant a leftover id dropped the tap through to the text path below, which
+  // returns silently — the contributor saw no reply at all.
+  const text = ctx.message?.text;
+  if (!text) {
     const opportunities = await ctx.sheets.getOpenOpportunities();
     const opp = opportunities.find((o) => o.id === oppId);
     if (!opp) {
@@ -54,9 +58,6 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
     );
     return;
   }
-
-  const text = ctx.message?.text;
-  if (!text) return;
 
   ctx.session.messageHistory.push({ role: "user", content: text });
 

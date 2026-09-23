@@ -133,6 +133,11 @@ bot.on("callback_query:data", async (ctx) => {
   } else if (data.startsWith("select_opp:")) {
     ctx.session.selectedOpportunityId = data.replace("select_opp:", "");
     ctx.session.phase = "negotiation";
+    // A new opportunity is a new draft. Carrying the previous loop's agreement id
+    // or Modify brief into it attaches this negotiation to terms from a different
+    // role — the same reset resolution.ts does before re-entering negotiation.
+    ctx.session.currentAgreementId = null;
+    ctx.session.negotiationContext = null;
     await ctx.answerCallbackQuery();
     await handleNegotiation(ctx);
   } else if (data.startsWith("review:")) {
