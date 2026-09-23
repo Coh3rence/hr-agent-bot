@@ -643,3 +643,58 @@ configuration: both real 2026-09-12 inputs — the approve+reject at $75 that pr
   reapply in future. Worth spot-checking again after any prompt edit, since nothing enforces it.
 - Case B cited `$75` and `$60` and nothing else — both supported figures (the candidate's own ask
   and the reviewer's counter), so the guard correctly let them through.
+
+---
+
+### 21. Selecting an opportunity does nothing if an earlier agreement id lingers — FIXED (2026-09-23)
+
+**Symptom, hit live.** The candidate tapped *Frontend Developer* on the match keyboard and the
+bot said nothing at all. No reply, no error message, no `Bot error:` line in the Railway log —
+the conversation simply stopped. Retapping did nothing either.
+
+**The tap was not lost.** The session on the production volume had moved:
+
+```json
+{ "phase": "negotiation", "selectedOpportunityId": "opp_002",
+  "currentAgreementId": "a_qa6_1789226816573" }
+```
+
+`select_opp:` set the phase and the opportunity, then called `handleNegotiation`, which fell
+through to a silent `return`. The entry branch was gated on **two** conditions:
+
+```ts
+if (!ctx.session.currentAgreementId && !ctx.message?.text) { /* introduce the role */ }
+const text = ctx.message?.text;
+if (!text) return;            // <- a callback query always lands here
+```
+
+A callback query carries no message text, so with `currentAgreementId` set the tap skipped the
+introduction and hit `if (!text) return`. That line is unreachable by any legitimate path — its
+only effect was to swallow this one.
+
+**Not a QA artefact.** `a_qa6_1789226816573` happened to be a QA row deleted from the sheet on
+2026-09-22, which is what made this surface now — §10's session persistence (correctly) kept the
+id across restarts while the row itself went away. But the id does not need to be stale:
+`select_opp:` never cleared it under any circumstance, so **any contributor who finishes one
+agreement and later picks a second opportunity gets the same dead end**. It needed a returning
+contributor to reach, which is why five QA rounds of first-time candidates missed it.
+
+**Fix, two parts.**
+1. `select_opp:` now clears `currentAgreementId` and `negotiationContext` — a new opportunity is
+   a new draft. This is the same reset `resolution.ts:218` already performed before re-entering
+   negotiation from *Modify*; the keyboard path had simply never been given it. Clearing
+   `negotiationContext` also stops a *Modify* brief for one role leaking into the system prompt
+   of a negotiation for a different one.
+2. `handleNegotiation` now branches on message text alone, deleting the unreachable
+   `if (!text) return`. Entering without text can only mean the keyboard, which always warrants
+   the introduction.
+
+Either part alone fixes the reported symptom; together they remove the silent path entirely.
+
+**Regression test** (`negotiation.test.ts`, 4 tests) pins the case with a lingering agreement id.
+Confirmed to fail against the previous condition and pass against the fix, so it is testing the
+behaviour and not just passing. Suite 123 pass.
+
+**Worth generalising:** a handler that returns without replying is invisible in production. There
+is no log line, no error, and Telegram shows the user nothing — §9 (no per-message logging) is
+what made this cost a live debugging session rather than a glance at the logs.
