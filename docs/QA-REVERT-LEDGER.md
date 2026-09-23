@@ -162,6 +162,17 @@ things beyond the agreement row:
 - Same caveat as K4: `railway up` uploads the working tree, not a git ref. The tree was
   clean at upload, so this build does correspond to `main` — but confirm by timestamp.
 
+### K6. §21 dead-end fix deployed 2026-09-23
+- Commits `eeea637` (fix + 4 regression tests), `5a4cdc0` (docs), then `railway up --service bot --ci`.
+- Build **`2026-09-23T13:30:35Z`** (previous: `2026-09-22T06:48:13Z`). Boot log clean.
+- Working tree was clean at upload, so this build corresponds to `main` — but per K4, confirm by
+  timestamp, not by `git log`.
+- **No sheet or config change**, so there is nothing to undo on the production data side.
+- One piece of live state is worth knowing: the persisted session for `535329585` still carried
+  `currentAgreementId: a_qa6_1789226816573` — a row deleted under R3 — *after* the restart, since
+  the volume is the point of K1. That is not a leak to clean; the fix clears it on the next
+  opportunity selection. It is recorded because it is the evidence §21 was real.
+
 ---
 
 ## Authorized users — unchanged
