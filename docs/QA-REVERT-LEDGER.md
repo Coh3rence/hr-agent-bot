@@ -106,8 +106,12 @@ things beyond the agreement row:
 ### R4. Local scratch scripts
 - `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_gate_tmp.ts`,
   `_guardwire_tmp.ts`, `_keycheck_tmp.ts`, `_modelcheck_tmp.ts`, `_proddump_tmp.ts`,
-  `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_qacontribclean_tmp.ts`, `_reachcheck_tmp.ts`,
-  `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
+  `_previewagg_tmp.ts`, `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_qacontribclean_tmp.ts`,
+  `_reachcheck_tmp.ts`, `_statecheck_tmp.ts`, `_supersede_tmp.ts`.
+- `_previewagg_tmp.ts` is the counterpart to `_reachcheck_tmp.ts` for the aggregation: it calls
+  `aggregateFeedback` directly with real recorded feedback, so it answers "what copy would the
+  candidate get" **without writing a row, sending a DM or changing a status**. It is how the
+  2026-09-24 mixed verdict was validated while a reviewer was still outstanding.
 - `_reachcheck_tmp.ts` is worth reading before deleting: it calls Telegram `getChat` per
   reviewer id, which answers "has this person opened the chat with the bot" **without sending
   them anything**. That question otherwise fails silently — an unreachable reviewer stalls
