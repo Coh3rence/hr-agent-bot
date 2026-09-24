@@ -173,6 +173,16 @@ things beyond the agreement row:
   the volume is the point of K1. That is not a leak to clean; the fix clears it on the next
   opportunity selection. It is recorded because it is the evidence §21 was real.
 
+### K7. §22 parser fix deployed 2026-09-24
+- Commits `64b3b7d` (fix + 5 tests), `6e8197a` (docs), then `railway up --service bot --ci`.
+- Build **`2026-09-24T18:37:16Z`** (previous: `2026-09-23T13:30:35Z`). Boot log clean.
+- **Deployed mid-review on purpose.** `a_1790186286202` was already `under_review` with neither
+  reviewer having responded; the fix had to be live *before* the reviewers were asked to word
+  their counters freely, which is the whole reason it was found. Verified the proposal survived
+  the restart still `under_review` — the sheet is the source of truth and the reviewers' inline
+  keyboards stay tappable across a redeploy.
+- **No sheet or config change**, so nothing to undo on the data side.
+
 ---
 
 ## Authorized users — unchanged
