@@ -190,6 +190,38 @@ describe("parseCounterFeedback", () => {
     expect(r.suggestedRate).toBeNull();
     expect(r.suggestedCommitment).toBeNull();
   });
+
+  // §22. A leading bare number is normally the rate, but not when it counts
+  // months or hours — "6 months at $70" booked $6/hr, and the candidate was shown
+  // a counter-offer no reviewer had proposed.
+  test("§22: a leading duration does not become the rate", () => {
+    const r = parseCounterFeedback("6 months at $70 would work better for us");
+    expect(r.suggestedRate).toBe(70);
+  });
+
+  test("§22: a leading weekly-hours figure does not become the rate", () => {
+    const r = parseCounterFeedback("40 hours a week at $70");
+    expect(r.suggestedRate).toBe(70);
+  });
+
+  test("§22: a duration-only counter records nothing, so the reviewer is re-asked", () => {
+    const r = parseCounterFeedback("we'd want 6 months rather than 3");
+    expect(r.suggestedRate).toBeNull();
+    expect(r.suggestedCommitment).toBeNull();
+  });
+
+  // hr/hrs denote the rate itself, so they must stay outside the duration list.
+  test("§22: an hr-suffixed rate is still a rate", () => {
+    expect(parseCounterFeedback("60 hr - above band").suggestedRate).toBe(60);
+    expect(parseCounterFeedback("60/hr - above band").suggestedRate).toBe(60);
+    expect(parseCounterFeedback("60 an hour is our ceiling").suggestedRate).toBe(60);
+  });
+
+  test("§22: duration, commitment and rate in one message each land correctly", () => {
+    const r = parseCounterFeedback("6 months, 80% commitment, $70/hr");
+    expect(r.suggestedRate).toBe(70);
+    expect(r.suggestedCommitment).toBe(80);
+  });
 });
 
 // ClaudeService's constructor makes no network call, and these aggregation

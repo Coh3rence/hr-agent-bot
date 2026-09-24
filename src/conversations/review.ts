@@ -121,13 +121,18 @@ export interface ParsedCounter {
  *     and a leading amount is often the rate being argued against rather than the
  *     target ("$50/hr is over budget, land at $40"), so the last one wins there.
  *     A number followed by a digit or % is not a rate, so "we need a commitment
- *     of 50%" is never misread as $50/hr.
+ *     of 50%" is never misread as $50/hr. A leading number followed by a duration
+ *     unit is a quantity of something else — "6 months at $70" means $70, not $6.
+ *     The abbreviations hr/hrs are deliberately NOT duration units, since they
+ *     denote the rate itself ("60 hr").
  *   - Commitment = a number adjacent to % anywhere in the message, on either
  *     side ("50%" or "%40"), e.g. "bump commitment to 50%". Leading bare number
  *     (rate) and number-with-% (commitment) don't collide, so we scan the
  *     original text for the percent.
  *   - Everything left over rides through as qualitative feedback.
  */
+const DURATION_UNIT = /^\s*(?:months?|mos?|weeks?|wks?|days?|years?|yrs?|hours?)\b/i;
+
 export function parseCounterFeedback(text: string): ParsedCounter {
   let suggestedRate: number | null = null;
   let suggestedCommitment: number | null = null;
@@ -137,8 +142,11 @@ export function parseCounterFeedback(text: string): ParsedCounter {
   const startsWithAmount = /^\s*\$/.test(text);
   const dollarAmounts = [...text.matchAll(/\$\s*(\d+(?:\.\d+)?)(?![\d%])/g)];
   const lastAmount = dollarAmounts.at(-1);
+  const leadsWithDuration =
+    !!leadingMatch &&
+    DURATION_UNIT.test(text.slice(leadingMatch[0].length));
 
-  if (leadingMatch && !startsWithAmount) {
+  if (leadingMatch && !startsWithAmount && !leadsWithDuration) {
     suggestedRate = Number(leadingMatch[1]);
     qualitative = text.slice(leadingMatch[0].length).replace(/^[\s\-:,.]+/, "").trim();
   } else if (lastAmount) {
