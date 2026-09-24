@@ -698,3 +698,49 @@ behaviour and not just passing. Suite 123 pass.
 **Worth generalising:** a handler that returns without replying is invisible in production. There
 is no log line, no error, and Telegram shows the user nothing — §9 (no per-message logging) is
 what made this cost a live debugging session rather than a glance at the logs.
+
+---
+
+### 22. A leading duration is parsed as the hourly rate — FIXED (2026-09-24)
+
+**Found by fuzzing the parser with realistic reviewer prose**, not by a failing run — while
+deciding whether reviewers could be left to word their counters freely instead of being handed a
+script to paste.
+
+`parseCounterFeedback` takes a leading bare number as the rate, because §11's prompt asks the
+reviewer to "start with the number". But a reviewer who opens with a duration gets that counted
+as money:
+
+```
+"6 months at $70 would work better for us."   ->  rate = 6     (the $70 ignored)
+"40 hours a week at $70."                     ->  rate = 40
+```
+
+**Why this one was worth stopping before a client-witnessed run.** The candidate would be shown,
+and could accept, a counter-offer of **$6/hr** — a figure nobody proposed. §20's guard does not
+help: it validates the model's summary against the *stored* suggested rates, and once `6` is
+stored it is a supported figure, so copy citing "$6/hr" passes. **The guard catches invented
+numbers, not correctly-stored wrong ones** — a useful limit to remember about it.
+
+**Fix.** A leading number immediately followed by a duration unit
+(`months|mos|weeks|wks|days|years|yrs|hours`) is not a rate; parsing falls through to the
+currency-anchored branch, which finds the `$70`. `hr`/`hrs` are deliberately **excluded** from
+that list — they denote the rate itself, so `60 hr` and `60/hr` must keep parsing as $60. A
+duration-only counter (`"we'd want 6 months rather than 3"`) now records nothing and the reviewer
+is re-asked, which is correct: **duration is not a counterable dimension at all** — there is no
+parser for it and `updateAgreementTerms` only reconciles rate and commitment.
+
+5 tests added, 3 of which were confirmed to fail against the previous parser. Suite 128 pass.
+
+**Known and deliberately not fixed — a bare rate mid-sentence is dropped:**
+
+```
+"Rate should come down to 60 and commitment to 80%."  ->  rate = null, commitment = 80
+```
+
+The `60` is neither leading nor currency-anchored, so it is ignored and only the commitment
+moves. A general "last bare number wins" rule was rejected because it misfires worse — it would
+read `"we'd want 6 months rather than 3"` as a rate of $3. The bot's own Counter prompt already
+tells reviewers to start with the number or use a dollar sign, so this stays a prompt-adherence
+case. **It fails safe** (drops a figure) where §22 failed dangerous (invents one), which is why
+the line was drawn here.
