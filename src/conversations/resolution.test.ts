@@ -85,6 +85,7 @@ function resolutionCtx(opts: {
   action: string;
   status: Agreement["status"];
   contributor?: Contributor | null;
+  round?: number;
 }) {
   const replies: string[] = [];
   const statusWrites: string[] = [];
@@ -111,7 +112,7 @@ function resolutionCtx(opts: {
           roleName: "Engineer",
           hourlyRate: 75,
           commitmentPercent: 60,
-          negotiationRound: 1,
+          negotiationRound: opts.round ?? 1,
           status: opts.status,
         }) as Agreement,
       getReviewFeedbacks: async () => [],
@@ -177,5 +178,35 @@ describe("handleResolution — the proposal must still be open", () => {
     const h = resolutionCtx({ action: "linked", status: "approved" });
     await handleResolution(h.ctx);
     expect(h.replies[0]).toContain("couldn't find your profile");
+  });
+});
+
+// DEF-1 / §14: the round is read off the persisted row so a cold session can't
+// buy a fresh budget. `nextRoundFromHistory` covers how the number is derived;
+// these cover the cap acting on it.
+describe("handleResolution — the negotiation round cap", () => {
+  test("Modify at the final round is refused, and the row is left standing", async () => {
+    const h = resolutionCtx({ action: "modify", status: "under_review", round: 2 });
+    await handleResolution(h.ctx);
+    expect(h.replies[0]).toContain("limit of 2 negotiation rounds");
+    // §23: refusing without superseding is what keeps the offer acceptable. A
+    // retired row would strand the candidate with nothing left to accept.
+    expect(h.statusWrites).toEqual([]);
+    expect(h.ctx.session.phase).toBe("resolution");
+  });
+
+  test("a round past the cap is refused too, not just the boundary", async () => {
+    const h = resolutionCtx({ action: "modify", status: "under_review", round: 3 });
+    await handleResolution(h.ctx);
+    expect(h.replies[0]).toContain("limit of 2 negotiation rounds");
+    expect(h.statusWrites).toEqual([]);
+  });
+
+  test("Modify below the cap retires the reviewed row and re-enters negotiation", async () => {
+    const h = resolutionCtx({ action: "modify", status: "under_review", round: 1 });
+    await handleResolution(h.ctx);
+    expect(h.statusWrites).toEqual(["superseded"]);
+    expect(h.ctx.session.phase).toBe("negotiation");
+    expect(h.ctx.session.currentAgreementId).toBeNull();
   });
 });
