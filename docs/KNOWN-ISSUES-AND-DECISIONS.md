@@ -815,3 +815,28 @@ whose Submit button stays live in the chat history).
 **Fix queued (QA-closeout Phase E):** refuse submit unless the row's live status is `draft`,
 mirroring `ensureOpenForReview`'s shape, with keyboard-strip on refusal. Also a prerequisite
 for §23's retire-on-commit, which widens the window in which a stale Submit tap is possible.
+
+---
+
+### 25. `/add_opportunity`'s step-by-step mode is a dead end — the follow-up message lands in the contributor gate — FOUND LIVE (2026-10-05)
+
+**Witnessed live during QA case B2.** The bare command replies *"You can provide all details
+at once or I'll ask step by step"*, then sets `phase = "idle"` with the comment "Admin flow
+handled separately" (`admin.ts:68`) — **no such flow exists**. The admin's next message routes
+through the idle → gate path like any contributor text. When the admin sent the role details
+as the promised follow-up, the bot answered *"Welcome back, Aleksa!"* and produced a match
+list — it read the job posting as a job application. No opportunity was created, and nothing
+signalled failure.
+
+**The failure masquerades as a feature,** which is worse than an error message: an admin who
+is also a contributor gets a plausible-looking match screen; an admin who is not gets
+discovery asking *them* to introduce themselves. Either way the admin lands in a candidate
+flow with no hint the add was dropped.
+
+**The only working path** is everything in one message:
+`/add_opportunity <title> - <description, skills, commitment range, rate range, responsibilities>`.
+The one-shot branch works correctly (Claude tool-use extraction, `admin.ts:73-111`).
+
+**Disposition:** Phase E. Minimal honest fix: the bare-command reply states the one-message
+requirement and stops promising a step-by-step mode. An admin collection phase would be the
+full fix but adds a session phase for little gain at current admin volume — not planned.
