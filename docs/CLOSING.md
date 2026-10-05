@@ -28,8 +28,8 @@ day-by-day schedule, and the pending human decisions.
 | D-a | Park the `opp_002` draft `a_1790584489474` | Aleksa | **DECIDED: parked** — safe indefinitely, sweep only touches `under_review` |
 | D-b | Authorize the QA-VERIFICATION.md backfill | Aleksa | **DECIDED: yes** — backfill done 2026-10-05 |
 | D-c | Keep the `_*_tmp.ts` scratch scripts | Aleksa | **DECIDED: keep** — ledger R4 closed as deliberate QA tooling |
-| D-d | §23 retire-on-commit design change | **Gustavo** | Proposal written (KNOWN-ISSUES §23) — message not yet sent. **Gates the last Phase E item** |
-| D-e | Test identities in the live Collabberry org | **Gustavo** | Not yet asked — bundle with the D-d message |
+| D-d | §23 retire-on-commit design change | **Gustavo** | **DECIDED: approved 2026-10-05** ("I'm good for you to change it! Makes sense") — ships in Phase E after §24 |
+| D-e | Test identities in the live Collabberry org | **Gustavo** | Asked 2026-10-05 — cleanup ownership still to be agreed; not blocking |
 
 ## 3. The compressed schedule (re-agreed 2026-10-05: target close Oct 7)
 

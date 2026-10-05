@@ -747,7 +747,7 @@ the line was drawn here.
 
 ---
 
-### 23. Tapping Modify destroys the standing offer before any new terms exist — OPEN, DECISION NEEDED (Gustavo)
+### 23. Tapping Modify destroys the standing offer before any new terms exist — FIX APPROVED (D-d, 2026-10-05)
 
 **Witnessed live 2026-09-28.** The post-review *Modify* handler supersedes the reviewed
 agreement **at the moment of the tap**, before the candidate has stated a single new term
@@ -792,9 +792,9 @@ Also amplified by the reviewer-DM gap (QA-COMPLETION-PLAN Appendix B, issue 3): 
 carry no round number or prior terms, so the two proposals this flow produces are
 near-indistinguishable to reviewers — the 09-09 failure shape again.
 
-**Disposition:** proposal sent to Gustavo 2026-10-05 as decision D-d. If approved, ships in
-the QA-closeout Phase E deploy together with §24; if declined, retire-on-tap stands and this
-section records the trade-off as accepted.
+**Disposition:** proposal sent to Gustavo 2026-10-05 as decision D-d; **approved by Gustavo
+the same day** ("I'm good for you to change it! Makes sense"). Retire-on-commit ships in the
+QA-closeout Phase E deploy, together with and after §24, which is its prerequisite.
 
 ---
 

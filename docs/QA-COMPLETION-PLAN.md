@@ -32,8 +32,9 @@ the contributor is already at round 2 of 2 — so a missed window had no retry.
 ## 2. Decisions needed before Phase D
 
 > **Resolved 2026-10-05** (see `docs/CLOSING.md` §2): D-a **park**, D-b **yes** (backfill
-> done), D-c **keep** (ledger R4 closed). D-d and D-e remain with Gustavo — proposal
-> written as KNOWN-ISSUES §23.
+> done), D-c **keep** (ledger R4 closed), D-d **approved by Gustavo** (retire-on-commit
+> ships in Phase E; write-up is KNOWN-ISSUES §23). Only D-e (test-identity cleanup
+> ownership) remains open — not blocking.
 
 | # | Decision | Owner | Recommendation |
 |---|---|---|---|
@@ -195,7 +196,7 @@ confirm any deploy by build timestamp, never by `git log`.
 - [ ] **Reviewer DM revision context** (issue 3)
 - [ ] **Submit status guard** (issue 4)
 - [ ] **Agreements lineage column** (issue 5)
-- [ ] **§23 retire-on-commit** — only after decision D-d
+- [ ] **§23 retire-on-commit** — approved (D-d, 2026-10-05); land after the submit guard
 
 ---
 
