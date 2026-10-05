@@ -1,8 +1,8 @@
 # Collabberry HR Agent — QA Verification Document
 
 **Environment:** Production<br>
-**Date of this run:** ______________<br>
-**Tester:** ______________<br>
+**Date of this run:** 2026-09-07 → ongoing (rolling campaign — each Result carries its own date)<br>
+**Tester:** Aleksa (@aleksaprosperitylabs)<br>
 **Client witness:** ______________
 
 ## 1. Systems under test
@@ -42,6 +42,11 @@ Reviewer pool is therefore `1971913512` and `302836662`, quorum 2 of 2.
 
 Each test has a **fixed expected result** agreed in advance. Walk them in order — later tests depend on state created by earlier ones. Record the outcome in the Result column as PASS / FAIL / N-A and put anything surprising in Notes. A FAIL is not necessarily a defect; note it and continue so the session isn't blocked.
 
+> **Backfilled 2026-10-05.** Result columns were filled from the recorded evidence of the
+> September–October QA campaign (sheet rows, timestamps, on-chain records), not from a single
+> sitting. Rows marked *Not yet run* are scheduled in the closeout plan
+> (`docs/QA-COMPLETION-PLAN.md`) and will be filled as they execute.
+
 ## 3. Configured business rules (verified in code, 2026-08-21)
 
 These are the rules the tests below assert against. All are environment-overridable without a code change.
@@ -62,9 +67,9 @@ These are the rules the tests below assert against. All are environment-overrida
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| A1 | Bot responds | Send `/start` to @Coh3erence_hr_bot | Bot replies; conversation begins | | |
-| A2 | Unauthorised user is gated | `/start` from an account not in AuthorizedUsers | Access is refused, no opportunity data leaks | | |
-| A3 | Admin authorisation | Admin runs `/authorize` for a new Telegram id | User is added and can now proceed | | |
+| A1 | Bot responds | Send `/start` to @Coh3erence_hr_bot | Bot replies; conversation begins | PASS | Both contributors onboarded via `/start` (2026-09-07, 2026-09-23) |
+| A2 | Unauthorised user is gated | `/start` from an account not in AuthorizedUsers | Access is refused, no opportunity data leaks | Not yet run | Scheduled — onboarding of a 4th (non-admin) account |
+| A3 | Admin authorisation | Admin runs `/authorize` for a new Telegram id | User is added and can now proceed | Not yet run | Scheduled with A2 — authorised as Contributor |
 
 ### B — Admin opportunity management
 
@@ -72,62 +77,64 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | | |
-| B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | | |
-| B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | | |
-| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | | |
+| B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | Not yet run | Scheduled — admin solo session |
+| B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | Not yet run | Scheduled — admin solo session |
+| B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | Not yet run | Scheduled — run against the B2 role |
+| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | Not yet run | Scheduled — run against the B2 role |
 
 ### C — Contributor discovery and matching
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| C1 | Natural-language intake | Describe skills conversationally, not as a form | Bot extracts skills, rate range, availability, timezone without rigid prompts | | |
-| C2 | Structured capture | Check the Contributors sheet row | Skills, commitment %, rate min/max, timezone, location all populated correctly | | |
-| C3 | Role match | Continue to matching | Bot proposes a relevant role with a match score | | |
-| C4 | Poor-fit handling | Offer skills unrelated to any open role | Bot declines gracefully rather than forcing a bad match | | |
+| C1 | Natural-language intake | Describe skills conversationally, not as a form | Bot extracts skills, rate range, availability, timezone without rigid prompts | PASS | Skills extracted conversationally into both Contributors rows (2026-09-07, 2026-09-23) |
+| C2 | Structured capture | Check the Contributors sheet row | Skills, commitment %, rate min/max, timezone, location all populated correctly | PASS | Both rows fully populated — skills, commitment %, rate min/max, timezone, location |
+| C3 | Role match | Continue to matching | Bot proposes a relevant role with a match score | PASS | `settlementLikelihood` populated on every agreement row |
+| C4 | Poor-fit handling | Offer skills unrelated to any open role | Bot declines gracefully rather than forcing a bad match | Not yet run | Scheduled — admin solo session (deliberately unmatchable skills) |
 
 ### D — Negotiation
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| D1 | Counter-offer | Propose a rate above budget | Bot negotiates; settlement likelihood reflects distance from budget | | |
-| D2 | Round cap | Tap "Modify Terms" after a second review | Revision limit reached; only Accept / Walk away are offered — no third round | | |
-| D3 | Submission | Accept terms | Agreement row created with status submitted; reviewers notified | | |
+| D1 | Counter-offer | Propose a rate above budget | Bot negotiates; settlement likelihood reflects distance from budget | PASS | `opp_002` budget $45–70: ask $75 → likelihood 74; ask $60 → 92 |
+| D2 | Round cap | Tap "Modify Terms" after a second review | Revision limit reached; only Accept / Walk away are offered — no third round | Not yet run | Unit-tested 2026-10-01 (`resolution.test.ts`, 3 tests, mutation-verified); live run scheduled at round 2 |
+| D3 | Submission | Accept terms | Agreement row created with status submitted; reviewers notified | PASS | `a_1790186286202` submitted 2026-09-23T17:58:06Z, both reviewers notified |
 
 ### E — Review and quorum
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| E1 | Reviewer notification | Check reviewer account | Reviewer receives the proposal with approve / counter options | | |
-| E2 | Approve path | Reviewer approves | Decision recorded in ReviewFeedback | | |
-| E3 | Counter path | Reviewer counters with a different rate | Suggested rate parsed and stored | | |
-| E4 | Majority quorum | With a pool of n reviewers | Review closes at `floor(n/2)+1` responses, not unanimity | | |
-| E5 | Late responder | Reviewer responds after quorum | Late response ignored, outcome unchanged | | |
-| E6 | 48h escalation | Leave a review unanswered past the window | Sweep escalates the agreement (runs every 15 min) | | |
+| E1 | Reviewer notification | Check reviewer account | Reviewer receives the proposal with approve / counter options | PASS | Gustavo and Simon both received the proposal and acted on it (2026-09-24) |
+| E2 | Approve path | Reviewer approves | Decision recorded in ReviewFeedback | PASS | Simon approve recorded 2026-09-24T20:53:20Z |
+| E3 | Counter path | Reviewer counters with a different rate | Suggested rate parsed and stored | PASS | Gustavo counter recorded 2026-09-24T09:12:53Z, `suggestedRate = 60` parsed and stored |
+| E4 | Majority quorum | With a pool of n reviewers | Review closes at `floor(n/2)+1` responses, not unanimity | Not yet run | Unit-evidenced (`quorum.test.ts`); live run scheduled at a pool of 3 — see note below |
+| E5 | Late responder | Reviewer responds after quorum | Late response ignored, outcome unchanged | Not yet run | Unit-evidenced (`quorum.test.ts`); live run scheduled at a pool of 3 — see note below |
+| E6 | 48h escalation | Leave a review unanswered past the window | Sweep escalates the agreement (runs every 15 min) | Not yet run | Scheduled — costs 48h of elapsed time; no agreement has yet reached `escalated` |
 
 > **On E4 and E5.** With a two-reviewer pool, `floor(2/2)+1 = 2`, so majority and unanimity coincide and there is no third reviewer left to respond late — neither case is observable in a live run at this pool size. Both are instead evidenced deterministically by the unit tests in `src/services/quorum.test.ts`, which assert the threshold across pool sizes 1–5 (a pool of 3 closing at 2, and of 5 at 3), that a late responder does not change an already-satisfied outcome, and that out-of-pool and repeat votes are not double-counted. Run with `bun test`.
+>
+> *Update 2026-10-05:* a fourth, non-admin candidate account is being onboarded, which makes the reviewer pool all three admins (quorum 2 of 3) — both cases become observable live and are scheduled in the closeout plan.
 
 ### F — Resolution
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| F1 | Aggregation | Multiple reviewers give differing rates | Feedback aggregated into a single coherent counter-offer | | |
-| F2 | Reconciliation | Reviewer counter changes the rate | Final agreement terms match the reviewer's counter, not the original ask | | |
-| F3 | Candidate accepts | Accept the resolved offer | Agreement status → approved | | |
-| F4 | Candidate rejects | Decline the offer | Contributor enters 3-day cooldown | | |
+| F1 | Aggregation | Multiple reviewers give differing rates | Feedback aggregated into a single coherent counter-offer | PASS | `aggregatedRate = 60` + coherent prose in column N, written 2026-09-24T20:53:29Z |
+| F2 | Reconciliation | Reviewer counter changes the rate | Final agreement terms match the reviewer's counter, not the original ask | Not yet run | Harness-evidenced 2026-09-14 (seeded row); live run scheduled — the priority case of the closeout |
+| F3 | Candidate accepts | Accept the resolved offer | Agreement status → approved | PASS | `a_1788962327012` status `approved` (2026-09-09) |
+| F4 | Candidate rejects | Decline the offer | Contributor enters 3-day cooldown | Not yet run | Scheduled — no contributor has yet had status `cooldown` |
 
 ### G — Collabberry integration (the critical path)
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| G1 | Invite issued | On acceptance | Bot sends a signup link to `/member-sign-up?invitationToken=…` | | |
-| G2 | Signup completes | Open link, connect a **fresh** wallet, sign up | Account created in Collabberry | | |
-| G3 | Confirmation tap | Return to Telegram, tap "I've signed up" | Bot links the wallet and creates the on-chain agreement | | |
-| G4 | Sheet updated | Check Contributors row | status `hired`, walletAddress and collabberryUserId populated | | |
-| G5 | Agreement recorded | Check Agreements row | `betaAppAgreementId` populated | | |
-| G6 | Renders in app | Open frontend Team view as org admin | Contributor and agreement visible with correct rate and commitment | | |
-| G7 | Rate conversion | Compare hourly ask to agreement marketRate | marketRate = hourly × 160 | | |
-| G8 | Single-use invite | Attempt to reuse a consumed invite token | Second redemption refused cleanly | | |
+| G1 | Invite issued | On acceptance | Bot sends a signup link to `/member-sign-up?invitationToken=…` | PASS | `collabberryInviteToken = 06ceee59-545e-452e-a836-5669f9115bf4` (2026-09-09) |
+| G2 | Signup completes | Open link, connect a **fresh** wallet, sign up | Account created in Collabberry | PASS | `collabberryUserId = e2a00877-9249-4fcc-a037-2943ba60d534` |
+| G3 | Confirmation tap | Return to Telegram, tap "I've signed up" | Bot links the wallet and creates the on-chain agreement | PASS | `walletAddress = 0x290a26a086d4ee4437c80aa1d669576cb7512061`, on-chain agreement created (Arbitrum One) |
+| G4 | Sheet updated | Check Contributors row | status `hired`, walletAddress and collabberryUserId populated | PASS | `c_1788807562702` status `hired`, wallet and userId both populated |
+| G5 | Agreement recorded | Check Agreements row | `betaAppAgreementId` populated | PASS | `betaAppAgreementId = 231b0916-c607-4fba-9a24-68d593dcfc3c` |
+| G6 | Renders in app | Open frontend Team view as org admin | Contributor and agreement visible with correct rate and commitment | Not yet run | Scheduled — browser inspection of the Team view ($40/hr, 50%) |
+| G7 | Rate conversion | Compare hourly ask to agreement marketRate | marketRate = hourly × 160 | Not yet run | Scheduled with G6 — expect `marketRate = 6400` (40 × 160); app-side only, not visible in the sheet |
+| G8 | Single-use invite | Attempt to reuse a consumed invite token | Second redemption refused cleanly | Not yet run | Scheduled — re-open the consumed G1 link (reuse the original message, don't hand-assemble the URL) |
 
 ## 5. Known limitations — disclose before testing
 
@@ -155,7 +162,7 @@ Configuration that is deliberately relaxed for testing and must be tightened bef
 
 ## 7. Outcome
 
-**Tests passed:** ____ / 32
+**Tests passed:** 16 / 32 proven as of 2026-10-05 — 0 failures; the remaining 16 are scheduled, not failed (see `docs/QA-COMPLETION-PLAN.md`)
 **Failures / follow-ups:**
 
 | ID | Issue | Severity | Owner | Action |
