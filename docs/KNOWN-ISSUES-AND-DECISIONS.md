@@ -744,3 +744,74 @@ read `"we'd want 6 months rather than 3"` as a rate of $3. The bot's own Counter
 tells reviewers to start with the number or use a dollar sign, so this stays a prompt-adherence
 case. **It fails safe** (drops a figure) where §22 failed dangerous (invents one), which is why
 the line was drawn here.
+
+---
+
+### 23. Tapping Modify destroys the standing offer before any new terms exist — OPEN, DECISION NEEDED (Gustavo)
+
+**Witnessed live 2026-09-28.** The post-review *Modify* handler supersedes the reviewed
+agreement **at the moment of the tap**, before the candidate has stated a single new term
+(`resolution.ts:208`). Merely *exploring* a revision is therefore destructive: there is no way
+to look at "what would I change?" and then decide the standing counter-offer was fine after all.
+
+**The round that proved it.** `a_1790186286202` (opp_002) was submitted
+2026-09-23T17:58:06Z. Gustavo countered at $60 on 2026-09-24T09:12:53Z, Simon approved at
+20:53:20Z, and the aggregated counter — $60/hr — was written and presented at 20:53:29Z. On
+2026-09-28 the candidate tapped **Modify** on that offer. The agreement went `superseded`
+immediately; the renegotiation produced draft `a_1790584489474` ($60/hr, round 2), which was
+never submitted. Net effect: a counter-offer that was *acceptable by one tap* on 09-24 no
+longer exists in any form, and the candidate's only remaining moves on that pair are
+submit-at-round-2-of-2 or nothing. (Decision D-a, 2026-10-05: the draft stays parked — safe
+indefinitely, the timeout sweep only touches `under_review` rows.)
+
+**Why the code is this way — this is §14's fix, not an accident.** Left `under_review`, the
+old row stayed in the sweep's view (a dead proposal would escalate and DM every admin) and
+kept every reviewer's inline keyboard answerable (taps landing silently on withdrawn terms —
+the 2026-09-09 incident). Retiring on tap closed both. The cost, unexamined at the time, is
+that the retirement happens before the replacement exists, so an abandoned revision strands
+the candidate with nothing.
+
+**The cap already bounds the damage at the boundary.** At `negotiationRound >= MAX`, Modify
+is refused *before* the supersede and the row is left standing (`resolution.ts:185-199`) —
+unit-tested 2026-10-01 (`resolution.test.ts`, 3 tests, mutation-verified). The destruction
+only occurs on a Modify *below* the cap.
+
+**Proposed change (decision D-d — Gustavo's call, not ours to make).** Retire-on-**commit**:
+keep the reviewed agreement alive until the revised terms are actually *submitted*, and
+supersede it then. This is a design change to a flow Gustavo specified, and it trades directly
+against the hazard §14 closed — between tap and commit, two live rows coexist and the old
+reviewer keyboards answer again. Prerequisites if approved:
+
+1. **§24 must land first.** The unguarded `review:submit:` is exactly the door through which
+   a coexisting old row becomes dangerous.
+2. The old row's reviewer keyboards stay refusable via `ensureOpenForReview` only *after* the
+   supersede — during the tap-to-commit window they are live by design, so the window must
+   either strip the old keyboards up front or accept late taps until commit.
+
+Also amplified by the reviewer-DM gap (QA-COMPLETION-PLAN Appendix B, issue 3): revision DMs
+carry no round number or prior terms, so the two proposals this flow produces are
+near-indistinguishable to reviewers — the 09-09 failure shape again.
+
+**Disposition:** proposal sent to Gustavo 2026-10-05 as decision D-d. If approved, ships in
+the QA-closeout Phase E deploy together with §24; if declined, retire-on-tap stands and this
+section records the trade-off as accepted.
+
+---
+
+### 24. `review:submit:` has no status guard — a stale Submit button can resurrect a dead draft — OPEN (found 2026-10-02)
+
+**The one callback path left unhardened.** After §14, reviewer taps are checked against live
+status (`ensureOpenForReview`); after §19, candidate resolution taps are too. But
+`review:submit:` (`review.ts:19-21`) writes `under_review` **unconditionally** and DMs every
+reviewer. A tap on the Submit button of a draft that has since died resurrects the row and
+pushes withdrawn terms to reviewers — §14's hazard arriving through the one door left open.
+
+**Found by code reading 2026-10-02, not reproduced live.** Current exposure is narrow but
+real: `review:modify:` strips the keyboard of the draft it retires (`review.ts:39`), so the
+risk is drafts abandoned by *other* routes — notably `select_opp:` (§21's fix clears
+`currentAgreementId` for the new role but does not supersede or strip the abandoned draft,
+whose Submit button stays live in the chat history).
+
+**Fix queued (QA-closeout Phase E):** refuse submit unless the row's live status is `draft`,
+mirroring `ensureOpenForReview`'s shape, with keyboard-strip on refusal. Also a prerequisite
+for §23's retire-on-commit, which widens the window in which a stale Submit tap is possible.
