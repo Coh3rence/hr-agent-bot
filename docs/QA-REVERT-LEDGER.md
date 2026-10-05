@@ -9,10 +9,11 @@ remediation) and **REVERT** (test scaffolding that must not survive handover).
 
 ## REVERT — before any client-witnessed run
 
-> **Status 2026-09-22: R1, R2, R3 and R5 are all DONE.** Production config is back to its
-> pre-QA state and the client's sheet holds only real rows. Two residuals, neither blocking a
-> client run: **R4** (local scratch scripts, gitignored — delete at handover) and the
-> unredeemed beta-app invite noted under R5, which no script in this repo can remove.
+> **Status 2026-10-05: R1–R5 are all closed.** Production config is back to its
+> pre-QA state and the client's sheet holds only real rows. R4 was closed by decision
+> D-c (2026-10-05): the scratch scripts are **kept as deliberate QA tooling**, not deleted.
+> One residual, not blocking a client run: the unredeemed beta-app invite noted under R5,
+> which no script in this repo can remove.
 
 ### R1. `ANTHROPIC_MODEL` is overridden to Haiku — **DONE 2026-09-22**
 - **Set to:** `claude-haiku-4-5-20251001` on the Railway `bot` service.
@@ -103,7 +104,11 @@ things beyond the agreement row:
   rate rather than their own ask requires a genuine tap; no dry run exercises
   `updateAgreementTerms`. Accepted cost, recorded rather than avoided.
 
-### R4. Local scratch scripts
+### R4. Local scratch scripts — **CLOSED 2026-10-05, resolution: KEEP (decision D-c)**
+- Reclassified from residue to **deliberate QA tooling**. They are gitignored so they never
+  reach the client repo, and they stay in active use (`_statecheck_tmp.ts` and
+  `_reachcheck_tmp.ts` were both used the week of 2026-09-29). Nothing to revert; the
+  "delete at handover" instruction below is superseded by this decision.
 - `_addadmin_tmp.ts`, `_authlist_tmp.ts`, `_fixrate_tmp.ts`, `_gate_tmp.ts`,
   `_guardwire_tmp.ts`, `_keycheck_tmp.ts`, `_modelcheck_tmp.ts`, `_proddump_tmp.ts`,
   `_previewagg_tmp.ts`, `_qa6_tmp.ts`, `_qa6clean_tmp.ts`, `_qacontribclean_tmp.ts`,
@@ -180,11 +185,15 @@ things beyond the agreement row:
 ### K7. §22 parser fix deployed 2026-09-24
 - Commits `64b3b7d` (fix + 5 tests), `6e8197a` (docs), then `railway up --service bot --ci`.
 - Build **`2026-09-24T18:37:16Z`** (previous: `2026-09-23T13:30:35Z`). Boot log clean.
-- **Deployed mid-review on purpose.** `a_1790186286202` was already `under_review` with neither
-  reviewer having responded; the fix had to be live *before* the reviewers were asked to word
-  their counters freely, which is the whole reason it was found. Verified the proposal survived
-  the restart still `under_review` — the sheet is the source of truth and the reviewers' inline
-  keyboards stay tappable across a redeploy.
+- **Deployed mid-review on purpose.** `a_1790186286202` was already `under_review`. Gustavo
+  had in fact already countered at `2026-09-24T09:12:53Z` — nine hours *before* the
+  `18:37:16Z` build — so his $60 counter was parsed by the **pre-fix** parser (it parsed
+  correctly: a leading bare `60` is the intended case). Simon had not yet responded; the fix
+  had to be live before *his* freely-worded reply arrived, which is the whole reason it was
+  found. Verified the proposal survived the restart still `under_review` — the sheet is the
+  source of truth and the reviewers' inline keyboards stay tappable across a redeploy.
+  *(Corrected 2026-10-05: this entry originally claimed neither reviewer had responded at
+  deploy time.)*
 - **No sheet or config change**, so nothing to undo on the data side.
 
 ---
