@@ -866,3 +866,40 @@ admin stopped to investigate instead; the sheet shows one row, no duplicate.)
 **Disposition:** Phase E, same family as Appendix B issue 2. Any message that interpolates
 IDs, rates, or model prose into `parse_mode: "Markdown"` has this bug; the fix is escaping or
 dropping parse_mode, not sprinkling more Markdown.
+
+### 27. Every opportunity edit fails — 12 values into an 11-column range — and the retry would have wiped the rate minimum — FOUND LIVE (2026-10-06)
+
+**Witnessed live during QA case B3** — the campaign's first FAIL. The admin sent
+`/edit_opportunity opp_1791280007760 raise the maximum rate to 80` and got silence. Railway
+logs (2026-10-06T10:10:52Z):
+
+```
+error: Requested writing within range [Opportunities!A5:K5], but tried writing to column [L]
+body: [["opp_1791280007760", …, 30, 70, 0, 80, …, "open", "535329585", ""]]
+```
+
+**Two independent defects, one masking the other:**
+
+1. **Schema drift makes every edit fail.** The Opportunities sheet has 11 columns (header row
+   ends at `createdBy`; there is no `createdAt` column). The code's model has 12 fields:
+   `getOpportunities` reads `A2:K` yet maps `row[11]` as `createdAt` — always undefined
+   (`sheets.ts:56,69`); `updateOpportunity` serializes 12 values into the 11-wide range
+   `A{n}:K{n}` (`sheets.ts:115-132`) → Google 400, deterministically, for **every** edit.
+   The error is uncaught, so the admin gets silence. `/pause_opportunity` calls the same
+   method → **B4 is equally broken**, as is the §19 reopen path (`status open` edit).
+
+2. **The partial-edit merge zeroes unmentioned bounds.** `handleEditOpportunity` rebuilds the
+   whole range from the extraction with `|| 0` defaults (`admin.ts:190-194`): "raise the
+   maximum rate to 80" became `hourlyRate: {min: 0, max: 80}`. Commitment has the same trap
+   (`min || 0`, `max || 100`, `admin.ts:196-200`). Defect 1 rejected the write, so **the bug
+   that broke the command prevented the bug that would have corrupted the data.** Sheet
+   verified unchanged: the role still reads $50–75.
+
+**Why it survived 18 passing cases:** B3/B4 had never been run; `updateOpportunity` was
+unexercised in production until today. Agreements use a separate, correct write path.
+
+**Disposition:** blocks B3, B4 and the §19 reopen — cannot pass without a code fix and a
+deploy. Fix both defects together: align the write (and the phantom `createdAt`) with the
+real 11-column schema, and merge partial edits against the base row instead of `|| 0`
+defaults. Scheduling decision (hotfix now vs. final Phase E deploy) recorded in the ledger
+when taken.
