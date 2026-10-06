@@ -747,7 +747,7 @@ the line was drawn here.
 
 ---
 
-### 23. Tapping Modify destroys the standing offer before any new terms exist — FIX APPROVED (D-d, 2026-10-05)
+### 23. Tapping Modify destroys the standing offer before any new terms exist — FIXED IN CODE 2026-10-06 (commit `6ed1c34`), awaiting Phase E deploy
 
 **Witnessed live 2026-09-28.** The post-review *Modify* handler supersedes the reviewed
 agreement **at the moment of the tap**, before the candidate has stated a single new term
@@ -796,9 +796,19 @@ near-indistinguishable to reviewers — the 09-09 failure shape again.
 the same day** ("I'm good for you to change it! Makes sense"). Retire-on-commit ships in the
 QA-closeout Phase E deploy, together with and after §24, which is its prerequisite.
 
+**Implemented 2026-10-06 (commit `6ed1c34`, after §24 in `465a0a3`).** Modify parks the
+reviewed row's id in the session (`pendingSupersedeId`) and leaves it `under_review`; the
+supersede happens in `review:submit:` via `supersedePendingRevision` — fetch-and-check, so an
+old row settled during the window, or a draft submitted for a different role, is left alone.
+The sweep cannot escalate the standing row in the meantime (it skips aggregated rows).
+Settling the standing offer (Accept/Walk away) retires the exploratory draft in turn — §24's
+guard alone would let it through, since its live status is still `draft`. Session loss
+mid-window degrades conservatively: the standing offer simply stays standing. 10 new unit
+tests (151 total). Awaiting Phase E deploy.
+
 ---
 
-### 24. `review:submit:` has no status guard — a stale Submit button can resurrect a dead draft — OPEN (found 2026-10-02)
+### 24. `review:submit:` has no status guard — a stale Submit button can resurrect a dead draft — FIXED IN CODE 2026-10-06 (commit `465a0a3`), awaiting Phase E deploy
 
 **The one callback path left unhardened.** After §14, reviewer taps are checked against live
 status (`ensureOpenForReview`); after §19, candidate resolution taps are too. But
@@ -815,6 +825,11 @@ whose Submit button stays live in the chat history).
 **Fix queued (QA-closeout Phase E):** refuse submit unless the row's live status is `draft`,
 mirroring `ensureOpenForReview`'s shape, with keyboard-strip on refusal. Also a prerequisite
 for §23's retire-on-commit, which widens the window in which a stale Submit tap is possible.
+
+**Implemented 2026-10-06 (commit `465a0a3`), exactly as queued:** `ensureSubmittable` passes
+only a live `draft`; anything else strips the keyboard and explains (distinct copy for
+already-submitted vs. revised/decided vs. missing). The successful submit now also retires its
+own keyboard, closing the double-submit window. 5 unit tests. Awaiting Phase E deploy.
 
 ---
 
