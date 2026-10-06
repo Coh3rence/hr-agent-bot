@@ -18,7 +18,10 @@ export async function handleReview(ctx: BotContext): Promise<void> {
 
   if (data.startsWith("review:submit:")) {
     const agreementId = data.replace("review:submit:", "");
+    if (!(await ensureSubmittable(ctx, agreementId))) return;
     await ctx.sheets.updateAgreementStatus(agreementId, "under_review");
+    // Retire the Submit/Modify keyboard — its buttons outlive the draft otherwise.
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
     ctx.session.phase = "review";
 
     await ctx.reply(
@@ -103,6 +106,29 @@ export async function ensureOpenForReview(ctx: BotContext, agreementId: string):
           "If the revised version needs your input, it'll arrive as a new message."
       : "I couldn't find that proposal — it may have been removed."
   );
+  return false;
+}
+
+/**
+ * Same hazard as ensureOpenForReview, from the contributor's side: the
+ * Submit/Modify keyboard outlives the draft it was attached to. A second tap on
+ * Submit — or a tap on a keyboard whose draft was since superseded or decided —
+ * must not re-file the agreement as under_review and re-ping every reviewer.
+ */
+export async function ensureSubmittable(ctx: BotContext, agreementId: string): Promise<boolean> {
+  const agreement = await ctx.sheets.getAgreement(agreementId);
+  if (agreement?.status === "draft") return true;
+
+  if (!agreement) console.error(`ensureSubmittable: agreement ${agreementId} not found`);
+
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  if (!agreement) {
+    await ctx.reply("I couldn't find that draft — it may have been removed. Send me a message to pick up where you left off.");
+  } else if (agreement.status === "under_review") {
+    await ctx.reply("This proposal is already with the core team — no need to submit it again. I'll notify you as soon as there's a decision.");
+  } else {
+    await ctx.reply("This draft is no longer active — it was revised or already decided. If you'd like to propose new terms, just send me a message.");
+  }
   return false;
 }
 

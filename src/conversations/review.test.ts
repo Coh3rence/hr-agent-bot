@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ensureOpenForReview, notifyAdminsOfWriteFailure, parseCounterFeedback } from "./review";
+import { ensureOpenForReview, ensureSubmittable, notifyAdminsOfWriteFailure, parseCounterFeedback } from "./review";
 import type { BotContext } from "../bot";
 import { ClaudeService } from "../services/claude";
 import type { Agreement, Contributor, ReviewerFeedback } from "../models/types";
@@ -47,6 +47,40 @@ describe("ensureOpenForReview", () => {
   test("a missing agreement refuses rather than throwing", async () => {
     const { ctx, replies } = reviewerCtx(null);
     expect(await ensureOpenForReview(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("couldn't find");
+  });
+});
+
+// §24: the contributor-side mirror of ensureOpenForReview. The Submit button
+// outlives the draft, so a late tap must not re-file it and re-ping reviewers.
+describe("ensureSubmittable", () => {
+  test("a draft accepts the submit tap", async () => {
+    const { ctx, replies } = reviewerCtx("draft");
+    expect(await ensureSubmittable(ctx, "a_1")).toBe(true);
+    expect(replies).toEqual([]);
+  });
+
+  test("a second tap on an already-submitted proposal is refused and says so", async () => {
+    const { ctx, replies } = reviewerCtx("under_review");
+    expect(await ensureSubmittable(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("already with the core team");
+  });
+
+  test("a superseded draft is refused — its replacement is the live one", async () => {
+    const { ctx, replies } = reviewerCtx("superseded");
+    expect(await ensureSubmittable(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("no longer active");
+  });
+
+  test("a decided agreement is refused", async () => {
+    const { ctx, replies } = reviewerCtx("approved");
+    expect(await ensureSubmittable(ctx, "a_1")).toBe(false);
+    expect(replies[0]).toContain("no longer active");
+  });
+
+  test("a missing agreement refuses rather than throwing", async () => {
+    const { ctx, replies } = reviewerCtx(null);
+    expect(await ensureSubmittable(ctx, "a_1")).toBe(false);
     expect(replies[0]).toContain("couldn't find");
   });
 });
