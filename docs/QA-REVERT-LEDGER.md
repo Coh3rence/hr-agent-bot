@@ -196,6 +196,23 @@ things beyond the agreement row:
   deploy time.)*
 - **No sheet or config change**, so nothing to undo on the data side.
 
+### K8. §27 edit/pause fix deployed 2026-10-06 (+§25, §26 ride-alongs)
+- Commit `224ff69` (fix + 5 tests), then `railway up --service bot --ci`.
+- Build **`2026-10-06T12:30:21Z`** (previous: `2026-09-24T18:37:16Z`). Boot log clean —
+  Sheets connected, sweep scheduled, sessions volume mounted.
+- **Deployed with nothing in review** — verified by state dump immediately before: no
+  agreement `under_review` (4 superseded, 1 approved, 1 parked draft `a_1790584489474`).
+- What shipped: §27 (Opportunities writes aligned to the real 11-column schema, phantom
+  `createdAt` removed from the model, partial edits deep-merge instead of zeroing bounds,
+  edits can change `status` so pause has an inverse, failed writes reply instead of dying
+  silently); §25 (bare `/add_opportunity` states the one-message requirement, no longer
+  promises the nonexistent step-by-step mode); §26 (create confirmation is plain text so the
+  id's underscore can't make Telegram drop the receipt).
+- **No sheet or config change.** Undo = redeploy the previous image (or `git revert 224ff69`
+  + `railway up`); nothing to clean on the data side. The surgical scope was deliberate:
+  §23/§24/lineage/reviewer-DM wait for the final Phase E batch so the behavior Phase D
+  exercises is not changed mid-campaign.
+
 ---
 
 ## Authorized users — unchanged

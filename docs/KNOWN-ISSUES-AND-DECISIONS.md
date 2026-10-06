@@ -818,7 +818,7 @@ for §23's retire-on-commit, which widens the window in which a stale Submit tap
 
 ---
 
-### 25. `/add_opportunity`'s step-by-step mode is a dead end — the follow-up message lands in the contributor gate — FOUND LIVE (2026-10-05)
+### 25. `/add_opportunity`'s step-by-step mode is a dead end — the follow-up message lands in the contributor gate — FIXED, DEPLOYED 2026-10-06 (build `2026-10-06T12:30:21Z`, K8)
 
 **Witnessed live during QA case B2.** The bare command replies *"You can provide all details
 at once or I'll ask step by step"*, then sets `phase = "idle"` with the comment "Admin flow
@@ -841,7 +841,7 @@ The one-shot branch works correctly (Claude tool-use extraction, `admin.ts:73-11
 requirement and stops promising a step-by-step mode. An admin collection phase would be the
 full fix but adds a session phase for little gain at current admin volume — not planned.
 
-### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FOUND LIVE (2026-10-05)
+### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FIXED AT THE PROVEN SITE, DEPLOYED 2026-10-06 (K8; the full parse_mode audit remains Phase E)
 
 **Witnessed live during QA case B2.** The opportunity `opp_1791280007760` was written to the
 sheet correctly, but the admin never saw *"Opportunity created!"*. Railway logs show why:
@@ -867,7 +867,7 @@ admin stopped to investigate instead; the sheet shows one row, no duplicate.)
 IDs, rates, or model prose into `parse_mode: "Markdown"` has this bug; the fix is escaping or
 dropping parse_mode, not sprinkling more Markdown.
 
-### 27. Every opportunity edit fails — 12 values into an 11-column range — and the retry would have wiped the rate minimum — FOUND LIVE (2026-10-06)
+### 27. Every opportunity edit fails — 12 values into an 11-column range — and the retry would have wiped the rate minimum — FIXED, DEPLOYED 2026-10-06 (build `2026-10-06T12:30:21Z`, K8)
 
 **Witnessed live during QA case B3** — the campaign's first FAIL. The admin sent
 `/edit_opportunity opp_1791280007760 raise the maximum rate to 80` and got silence. Railway
