@@ -55,6 +55,22 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
     }
   }
 
+  // §23: settling THIS row (accepting it or walking away) makes any exploratory
+  // revision of it the dead branch. Retire that parked draft before the session
+  // is rehydrated over it — its Submit button otherwise files terms the
+  // candidate just decided against, and §24's guard would let a draft through.
+  if ((action === "accept" || action === "walkaway") && ctx.session.pendingSupersedeId === agreementId) {
+    const draftId = ctx.session.currentAgreementId;
+    if (draftId && draftId !== agreementId) {
+      await ctx.sheets
+        .updateAgreementStatus(draftId, "superseded")
+        .catch((err) =>
+          console.error(`handleResolution ${action}: could not retire revision draft ${draftId}:`, err)
+        );
+    }
+    ctx.session.pendingSupersedeId = null;
+  }
+
   // Rehydrate so the branch logic (and any re-entered negotiation) works even if
   // this is a cold session that has lost the in-memory negotiation context.
   ctx.session.currentAgreementId = agreementId;
@@ -198,18 +214,17 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
       return;
     }
 
-    // Build the brief before retiring the row — it reads the counter-offer off
-    // the agreement being replaced.
     const negotiationContext = await buildModifyContext(agreementId, ctx.sheets);
 
-    // Retire the reviewed proposal. Left `under_review` it stayed in the sweep's
-    // view and kept every reviewer's inline keyboard answerable, so late taps
-    // landed on terms the contributor had already walked back.
-    await ctx.sheets
-      .updateAgreementStatus(agreementId, "superseded")
-      .catch((err) =>
-        console.error(`handleResolution modify: could not supersede ${agreementId}:`, err)
-      );
+    // §23 retire-on-commit (D-d, approved by Gustavo 2026-10-05): the reviewed
+    // row stays standing — merely exploring a revision must not destroy the
+    // offer the candidate can still accept. The id is parked here and the
+    // supersede happens when the revision is actually submitted
+    // (supersedePendingRevision in review.ts). Accepted cost: until that commit
+    // the old reviewer keyboards stay answerable, but the terms they point at
+    // genuinely are still the standing offer. The sweep cannot escalate the row
+    // in the meantime — it skips aggregated rows.
+    ctx.session.pendingSupersedeId = agreementId;
 
     // Re-enter negotiation. Clear currentAgreementId so a fresh draft is created
     // when the new terms complete. The prior offer + counter + reviewer reasons
@@ -328,4 +343,5 @@ function resetSession(ctx: BotContext): void {
   ctx.session.selectedOpportunityId = null;
   ctx.session.messageHistory = [];
   ctx.session.negotiationContext = null;
+  ctx.session.pendingSupersedeId = null;
 }

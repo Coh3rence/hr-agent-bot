@@ -117,4 +117,7 @@ export interface SessionData {
   pendingReviewAgreementId: string | null;
   pendingReviewDecision: "counter" | "reject" | null;
   negotiationContext: string | null;
+  // §23 retire-on-commit: the reviewed agreement a Modify is revising; superseded
+  // only when the revision is actually submitted, not at the Modify tap.
+  pendingSupersedeId: string | null;
 }

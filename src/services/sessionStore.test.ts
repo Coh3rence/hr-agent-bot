@@ -66,6 +66,7 @@ describe("SessionData survives a JSON round-trip", () => {
       pendingReviewAgreementId: "a_1788808260898",
       pendingReviewDecision: "counter",
       negotiationContext: "asked 50, budget 20-40",
+      pendingSupersedeId: "a_1788808260898",
     };
 
     expect(JSON.parse(JSON.stringify(session))).toEqual(session);

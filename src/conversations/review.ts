@@ -22,6 +22,8 @@ export async function handleReview(ctx: BotContext): Promise<void> {
     await ctx.sheets.updateAgreementStatus(agreementId, "under_review");
     // Retire the Submit/Modify keyboard — its buttons outlive the draft otherwise.
     await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+    // §23: the revision is now committed — retire the reviewed row it replaces.
+    await supersedePendingRevision(ctx, agreementId);
     ctx.session.phase = "review";
 
     await ctx.reply(
@@ -130,6 +132,37 @@ export async function ensureSubmittable(ctx: BotContext, agreementId: string): P
     await ctx.reply("This draft is no longer active — it was revised or already decided. If you'd like to propose new terms, just send me a message.");
   }
   return false;
+}
+
+/**
+ * §23 retire-on-commit (D-d): a post-review Modify leaves the reviewed row
+ * standing and parks its id in the session; submitting the revision is the
+ * commit that retires it. Fetch-and-check rather than a blind write — the old
+ * row may have been settled during the window (accepted, walked away,
+ * escalated), and a draft submitted for a DIFFERENT role must not retire a
+ * standing offer it does not revise.
+ */
+export async function supersedePendingRevision(ctx: BotContext, submittedId: string): Promise<void> {
+  const oldId = ctx.session.pendingSupersedeId;
+  ctx.session.pendingSupersedeId = null;
+  if (!oldId || oldId === submittedId) return;
+
+  try {
+    const [oldRow, submitted] = await Promise.all([
+      ctx.sheets.getAgreement(oldId),
+      ctx.sheets.getAgreement(submittedId),
+    ]);
+    if (oldRow?.status !== "under_review") return;
+    if (submitted && submitted.opportunityId !== oldRow.opportunityId) return;
+    await ctx.sheets.updateAgreementStatus(oldId, "superseded");
+  } catch (err) {
+    // Loud: a failed supersede leaves the old row's reviewer keyboards
+    // answerable (ensureOpenForReview still passes) beside the live revision.
+    console.error(
+      `supersedePendingRevision: could not supersede ${oldId} after ${submittedId} was submitted:`,
+      err
+    );
+  }
 }
 
 export interface ParsedCounter {

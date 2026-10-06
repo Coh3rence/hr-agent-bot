@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { ensureOpenForReview, ensureSubmittable, notifyAdminsOfWriteFailure, parseCounterFeedback } from "./review";
+import {
+  ensureOpenForReview,
+  ensureSubmittable,
+  notifyAdminsOfWriteFailure,
+  parseCounterFeedback,
+  supersedePendingRevision,
+} from "./review";
 import type { BotContext } from "../bot";
 import { ClaudeService } from "../services/claude";
 import type { Agreement, Contributor, ReviewerFeedback } from "../models/types";
@@ -82,6 +88,96 @@ describe("ensureSubmittable", () => {
     const { ctx, replies } = reviewerCtx(null);
     expect(await ensureSubmittable(ctx, "a_1")).toBe(false);
     expect(replies[0]).toContain("couldn't find");
+  });
+});
+
+function supersedeCtx(opts: {
+  pendingId: string | null;
+  rows: Record<string, Partial<Agreement>>;
+  failWrite?: boolean;
+}) {
+  const writes: string[] = [];
+  const ctx = {
+    session: { pendingSupersedeId: opts.pendingId },
+    sheets: {
+      getAgreement: async (id: string) =>
+        opts.rows[id] ? ({ id, ...opts.rows[id] } as Agreement) : null,
+      updateAgreementStatus: async (id: string, status: string) => {
+        if (opts.failWrite) throw new Error("Sheets is down");
+        writes.push(`${id}:${status}`);
+      },
+    },
+  } as unknown as BotContext;
+  return { ctx, writes };
+}
+
+// §23 retire-on-commit: submitting a revision is the moment the reviewed row it
+// replaces gets retired. Fetch-and-check, never a blind write.
+describe("supersedePendingRevision", () => {
+  test("a committed revision supersedes the reviewed row it revises", async () => {
+    const h = supersedeCtx({
+      pendingId: "a_old",
+      rows: {
+        a_old: { status: "under_review", opportunityId: "opp_1" },
+        a_new: { status: "under_review", opportunityId: "opp_1" },
+      },
+    });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.writes).toEqual(["a_old:superseded"]);
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
+  });
+
+  test("no revision window open → nothing happens", async () => {
+    const h = supersedeCtx({ pendingId: null, rows: {} });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.writes).toEqual([]);
+  });
+
+  test("an old row settled during the window is left alone", async () => {
+    const h = supersedeCtx({
+      pendingId: "a_old",
+      rows: {
+        a_old: { status: "approved", opportunityId: "opp_1" },
+        a_new: { status: "under_review", opportunityId: "opp_1" },
+      },
+    });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.writes).toEqual([]);
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
+  });
+
+  test("a draft for a DIFFERENT role does not retire a standing offer it never revised", async () => {
+    const h = supersedeCtx({
+      pendingId: "a_old",
+      rows: {
+        a_old: { status: "under_review", opportunityId: "opp_1" },
+        a_new: { status: "under_review", opportunityId: "opp_2" },
+      },
+    });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.writes).toEqual([]);
+  });
+
+  test("a parked id equal to the submitted id is ignored", async () => {
+    const h = supersedeCtx({
+      pendingId: "a_new",
+      rows: { a_new: { status: "under_review", opportunityId: "opp_1" } },
+    });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.writes).toEqual([]);
+  });
+
+  test("a failed supersede write logs rather than breaking the submit flow", async () => {
+    const h = supersedeCtx({
+      pendingId: "a_old",
+      rows: {
+        a_old: { status: "under_review", opportunityId: "opp_1" },
+        a_new: { status: "under_review", opportunityId: "opp_1" },
+      },
+      failWrite: true,
+    });
+    await supersedePendingRevision(h.ctx, "a_new");
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
   });
 });
 

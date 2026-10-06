@@ -86,6 +86,8 @@ function resolutionCtx(opts: {
   status: Agreement["status"];
   contributor?: Contributor | null;
   round?: number;
+  pendingSupersedeId?: string | null;
+  currentAgreementId?: string | null;
 }) {
   const replies: string[] = [];
   const statusWrites: string[] = [];
@@ -99,9 +101,10 @@ function resolutionCtx(opts: {
       phase: "resolution",
       contributorId: null,
       selectedOpportunityId: null,
-      currentAgreementId: null,
+      currentAgreementId: opts.currentAgreementId ?? null,
       messageHistory: [],
       negotiationContext: null,
+      pendingSupersedeId: opts.pendingSupersedeId ?? null,
     },
     sheets: {
       getAgreement: async () =>
@@ -118,8 +121,8 @@ function resolutionCtx(opts: {
       getReviewFeedbacks: async () => [],
       getCandidateOffer: async () => null,
       getContributorById: async () => opts.contributor ?? null,
-      updateAgreementStatus: async (_id: string, status: string) => {
-        statusWrites.push(status);
+      updateAgreementStatus: async (id: string, status: string) => {
+        statusWrites.push(`${id}:${status}`);
       },
       updateContributor: async () => {},
     },
@@ -169,7 +172,7 @@ describe("handleResolution — the proposal must still be open", () => {
   test("an open proposal still passes the guard", async () => {
     const h = resolutionCtx({ action: "accept", status: "under_review" });
     await handleResolution(h.ctx);
-    expect(h.statusWrites).toEqual(["approved"]);
+    expect(h.statusWrites).toEqual(["a_1:approved"]);
   });
 
   // `linked` runs after `accept` has already moved the row to `approved`. Guarding
@@ -202,11 +205,67 @@ describe("handleResolution — the negotiation round cap", () => {
     expect(h.statusWrites).toEqual([]);
   });
 
-  test("Modify below the cap retires the reviewed row and re-enters negotiation", async () => {
+  test("Modify below the cap re-enters negotiation without retiring the row (§23)", async () => {
     const h = resolutionCtx({ action: "modify", status: "under_review", round: 1 });
     await handleResolution(h.ctx);
-    expect(h.statusWrites).toEqual(["superseded"]);
+    // Retire-on-commit: exploring a revision must not destroy the standing
+    // offer. The row is parked for supersede at submit time instead.
+    expect(h.statusWrites).toEqual([]);
     expect(h.ctx.session.phase).toBe("negotiation");
     expect(h.ctx.session.currentAgreementId).toBeNull();
+    expect(h.ctx.session.pendingSupersedeId).toBe("a_1");
+  });
+});
+
+// §23 retire-on-commit (D-d): between the Modify tap and the revision's submit,
+// the reviewed row and an exploratory draft coexist. Settling the reviewed row
+// (Accept or Walk away) makes the draft the dead branch — it must be retired, or
+// its Submit button later files terms the candidate decided against (and §24's
+// guard would let it through: its status is still `draft`).
+describe("handleResolution — settling the standing offer retires the exploratory draft", () => {
+  test("Accept during a revision window retires the parked draft", async () => {
+    const h = resolutionCtx({
+      action: "accept",
+      status: "under_review",
+      pendingSupersedeId: "a_1",
+      currentAgreementId: "a_2",
+    });
+    await handleResolution(h.ctx);
+    expect(h.statusWrites).toEqual(["a_2:superseded", "a_1:approved"]);
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
+  });
+
+  test("Walk away during a revision window retires the parked draft too", async () => {
+    const h = resolutionCtx({
+      action: "walkaway",
+      status: "under_review",
+      pendingSupersedeId: "a_1",
+      currentAgreementId: "a_2",
+    });
+    await handleResolution(h.ctx);
+    expect(h.statusWrites).toEqual(["a_2:superseded", "a_1:rejected"]);
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
+  });
+
+  test("Accept with no draft yet just clears the parked id", async () => {
+    const h = resolutionCtx({
+      action: "accept",
+      status: "under_review",
+      pendingSupersedeId: "a_1",
+    });
+    await handleResolution(h.ctx);
+    expect(h.statusWrites).toEqual(["a_1:approved"]);
+    expect(h.ctx.session.pendingSupersedeId).toBeNull();
+  });
+
+  test("Accept of an unrelated proposal leaves another window's draft alone", async () => {
+    const h = resolutionCtx({
+      action: "accept",
+      status: "under_review",
+      pendingSupersedeId: "a_other",
+      currentAgreementId: "a_2",
+    });
+    await handleResolution(h.ctx);
+    expect(h.statusWrites).toEqual(["a_1:approved"]);
   });
 });

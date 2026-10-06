@@ -63,6 +63,7 @@ bot.use(
       pendingReviewAgreementId: null,
       pendingReviewDecision: null,
       negotiationContext: null,
+      pendingSupersedeId: null,
     }),
     storage: new FileAdapter<SessionData>({ dirName: config.SESSION_DIR }),
   })
