@@ -61,6 +61,43 @@ export function mergeOpportunity(base: Opportunity, updates: OpportunityUpdate):
   };
 }
 
+/** The terms a revision is revising, for the reviewer DM (issue 3). */
+export interface PriorTerms {
+  hourlyRate: number;
+  commitmentPercent: number;
+  durationMonths: number;
+  counteredRate: number | null;
+  counteredCommitment: number | null;
+}
+
+export function priorTermsFromRows(
+  rows: string[][],
+  contributorId: string,
+  opportunityId: string,
+  excludeId: string
+): PriorTerms | null {
+  const matches = rows.filter(
+    (r) => r[0] && r[0] !== excludeId && r[1] === opportunityId && r[2] === contributorId
+  );
+  // The tab is append-only, so the last match is the most recent attempt.
+  const row = matches[matches.length - 1];
+  if (!row) return null;
+
+  const numOrNull = (v: string | undefined) => {
+    if (v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  };
+
+  return {
+    hourlyRate: Number(row[5]),
+    commitmentPercent: Number(row[6]),
+    durationMonths: Number(row[7]),
+    counteredRate: numOrNull(row[12]),
+    counteredCommitment: numOrNull(row[16]),
+  };
+}
+
 export class SheetsService {
   private sheets!: sheets_v4.Sheets;
   private spreadsheetId: string;
@@ -337,6 +374,24 @@ export class SheetsService {
       }));
 
     return nextRoundFromHistory(history, contributorId, opportunityId);
+  }
+
+  /**
+   * The latest earlier agreement for the same contributor+opportunity — the
+   * terms a revision is revising, plus what reviewers countered on them
+   * (M=rate, Q=commitment). Null when this is the pair's first attempt.
+   */
+  async getPriorAgreementTerms(
+    contributorId: string,
+    opportunityId: string,
+    excludeId: string
+  ): Promise<PriorTerms | null> {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: "Agreements!A2:Q",
+    });
+
+    return priorTermsFromRows(res.data.values || [], contributorId, opportunityId, excludeId);
   }
 
   async addAgreement(agreement: Agreement): Promise<void> {

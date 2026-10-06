@@ -4,6 +4,7 @@ import {
   mergeOpportunity,
   nextRoundFromHistory,
   opportunityToRow,
+  priorTermsFromRows,
   type AgreementRoundRow,
 } from "./sheets";
 
@@ -102,5 +103,87 @@ describe("mergeOpportunity", () => {
   test("an explicit zero is applied, not treated as missing", () => {
     const merged = mergeOpportunity(baseOpp, { commitmentPercent: { min: 0 } });
     expect(merged.commitmentPercent).toEqual({ min: 0, max: 70 });
+  });
+});
+
+// Issue 3: the reviewer DM's "what is this revising?" block reads the prior
+// attempt for the same contributor+opportunity off the Agreements tab.
+describe("priorTermsFromRows", () => {
+  // Column layout: A=id, B=opportunityId, C=contributorId, F=rate, G=commitment,
+  // H=duration, M=aggregatedRate, Q=aggregatedCommitment.
+  const row = (
+    id: string,
+    opp: string,
+    contributor: string,
+    rate: string,
+    commitment: string,
+    duration: string,
+    counteredRate = "",
+    counteredCommitment = ""
+  ) => {
+    const r = new Array<string>(17).fill("");
+    r[0] = id;
+    r[1] = opp;
+    r[2] = contributor;
+    r[5] = rate;
+    r[6] = commitment;
+    r[7] = duration;
+    r[12] = counteredRate;
+    r[16] = counteredCommitment;
+    return r;
+  };
+
+  test("finds the prior attempt and the reviewers' counter on it", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "50", "40", "3", "40", "50"),
+      row("a_2", "opp_1", "c_1", "45", "50", "3"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_2")).toEqual({
+      hourlyRate: 50,
+      commitmentPercent: 40,
+      durationMonths: 3,
+      counteredRate: 40,
+      counteredCommitment: 50,
+    });
+  });
+
+  test("the submitted agreement itself is never its own prior", () => {
+    const rows = [row("a_1", "opp_1", "c_1", "50", "40", "3")];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_1")).toBeNull();
+  });
+
+  test("the LAST earlier attempt wins, not the first", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "45", "6"),
+      row("a_3", "opp_1", "c_1", "42", "50", "6"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_3")?.hourlyRate).toBe(45);
+  });
+
+  test("another contributor's attempt at the same role is not a prior", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_other", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "50", "3"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_2")).toBeNull();
+  });
+
+  test("the same contributor's attempt at another role is not a prior", () => {
+    const rows = [
+      row("a_1", "opp_other", "c_1", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "50", "3"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_2")).toBeNull();
+  });
+
+  test("blank counter cells come back null, not zero", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "50", "3"),
+    ];
+    const prior = priorTermsFromRows(rows, "c_1", "opp_1", "a_2");
+    expect(prior?.counteredRate).toBeNull();
+    expect(prior?.counteredCommitment).toBeNull();
   });
 });

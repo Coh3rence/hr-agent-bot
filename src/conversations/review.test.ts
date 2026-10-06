@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   ensureOpenForReview,
   ensureSubmittable,
+  formatPriorTermsBlock,
   notifyAdminsOfWriteFailure,
   parseCounterFeedback,
   supersedePendingRevision,
@@ -404,5 +405,50 @@ describe("aggregateFeedback commitment (offline fast-paths)", () => {
     );
     expect(r?.outcome).toBe("all_reject");
     expect(r?.suggestedCommitment).toBeNull();
+  });
+});
+
+// Issue 3: two reviewer DMs for the same role came out character-for-character
+// identical on 2026-09-09 — nothing marked the second as a revision or showed
+// what the candidate moved from.
+describe("formatPriorTermsBlock", () => {
+  test("a first proposal has no block at all", () => {
+    expect(formatPriorTermsBlock(null)).toBe("");
+  });
+
+  test("a revision shows the prior ask and what reviewers countered", () => {
+    const block = formatPriorTermsBlock({
+      hourlyRate: 50,
+      commitmentPercent: 40,
+      durationMonths: 3,
+      counteredRate: 40,
+      counteredCommitment: 50,
+    });
+    expect(block).toContain("Previous ask: $50/hr, 40%, 3 months");
+    expect(block).toContain("Reviewers countered: rate $40/hr, commitment 50%");
+  });
+
+  test("an escalated prior (no counter written) still shows the previous ask", () => {
+    const block = formatPriorTermsBlock({
+      hourlyRate: 50,
+      commitmentPercent: 40,
+      durationMonths: 3,
+      counteredRate: null,
+      counteredCommitment: null,
+    });
+    expect(block).toContain("Previous ask: $50/hr");
+    expect(block).not.toContain("countered");
+  });
+
+  test("a rate-only counter does not invent a commitment", () => {
+    const block = formatPriorTermsBlock({
+      hourlyRate: 50,
+      commitmentPercent: 40,
+      durationMonths: 3,
+      counteredRate: 40,
+      counteredCommitment: null,
+    });
+    expect(block).toContain("Reviewers countered: rate $40/hr");
+    expect(block).not.toContain("commitment");
   });
 });

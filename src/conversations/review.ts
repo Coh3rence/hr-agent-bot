@@ -2,6 +2,7 @@ import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
 import type { ReviewerFeedback } from "../models/types";
 import { isReviewComplete, reviewRecipients } from "../services/quorum";
+import type { PriorTerms } from "../services/sheets";
 import { selfReviewAllowed } from "../config";
 import { presentToCandidate } from "../services/presentation";
 import { aggregateForAgreement } from "../services/aggregation";
@@ -387,6 +388,24 @@ export async function notifyAdminsOfWriteFailure(
   }
 }
 
+/**
+ * The revision block of the reviewer DM (issue 3). Rendered from the agreement
+ * row alone, two DMs for the same role came out character-for-character
+ * identical (2026-09-09) — a reviewer had no way to tell a revision from a
+ * duplicate, or to see what the candidate moved from. Pure so it's unit-testable.
+ */
+export function formatPriorTermsBlock(prior: PriorTerms | null): string {
+  if (!prior) return "";
+  let block =
+    `Previous ask: $${prior.hourlyRate}/hr, ${prior.commitmentPercent}%, ` +
+    `${prior.durationMonths} months\n`;
+  const counters: string[] = [];
+  if (prior.counteredRate !== null) counters.push(`rate $${prior.counteredRate}/hr`);
+  if (prior.counteredCommitment !== null) counters.push(`commitment ${prior.counteredCommitment}%`);
+  if (counters.length > 0) block += `Reviewers countered: ${counters.join(", ")}\n`;
+  return block + "\n";
+}
+
 async function notifyReviewers(ctx: BotContext, agreementId: string): Promise<void> {
   const agreement = await ctx.sheets.getAgreement(agreementId);
   if (!agreement) {
@@ -408,9 +427,28 @@ async function notifyReviewers(ctx: BotContext, agreementId: string): Promise<vo
     return;
   }
 
+  const round = agreement.negotiationRound;
+  const maxRounds = ctx.config.MAX_NEGOTIATION_ROUNDS;
+  let prior: PriorTerms | null = null;
+  if (round > 1) {
+    // Best-effort: a revision DM without the prior terms is still a revision DM.
+    prior = await ctx.sheets
+      .getPriorAgreementTerms(agreement.contributorId, agreement.opportunityId, agreementId)
+      .catch((err) => {
+        console.error(`notifyReviewers: could not load prior terms for ${agreementId}:`, err);
+        return null;
+      });
+  }
+
+  const title =
+    round > 1
+      ? `Revised proposal for review — round ${round} of ${maxRounds}`
+      : `New proposal for review`;
+
   const handle = contributor.telegramHandle ? ` (@${contributor.telegramHandle})` : "";
   const message =
-    `New proposal for review\n\n` +
+    `${title}\n\n` +
+    formatPriorTermsBlock(prior) +
     `Contributor: ${contributor.name}${handle}\n` +
     `Skills: ${contributor.skills.join(", ")}\n\n` +
     `Role: ${agreement.roleName}\n` +
