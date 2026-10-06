@@ -77,8 +77,8 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
-| B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | Not yet run | Scheduled — admin solo session |
-| B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | Not yet run | Scheduled — admin solo session |
+| B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | **PASS** (2026-10-05) | All three seeded roles returned with commitment, budget and status |
+| B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | **PASS** (2026-10-05) | `opp_1791280007760` "Full-Stack Web3 Developer" written to Opportunities sheet, status open. Two defects found live: bare command is a dead end (§25); confirmation reply dropped by Telegram Markdown 400 (§26) — the write succeeded regardless |
 | B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | Not yet run | Scheduled — run against the B2 role |
 | B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | Not yet run | Scheduled — run against the B2 role |
 
@@ -162,7 +162,7 @@ Configuration that is deliberately relaxed for testing and must be tightened bef
 
 ## 7. Outcome
 
-**Tests passed:** 16 / 32 proven as of 2026-10-05 — 0 failures; the remaining 16 are scheduled, not failed (see `docs/QA-COMPLETION-PLAN.md`)
+**Tests passed:** 18 / 32 proven as of 2026-10-05 — 0 failures; the remaining 14 are scheduled, not failed (see `docs/QA-COMPLETION-PLAN.md`)
 **Failures / follow-ups:**
 
 | ID | Issue | Severity | Owner | Action |

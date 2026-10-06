@@ -840,3 +840,29 @@ The one-shot branch works correctly (Claude tool-use extraction, `admin.ts:73-11
 **Disposition:** Phase E. Minimal honest fix: the bare-command reply states the one-message
 requirement and stops promising a step-by-step mode. An admin collection phase would be the
 full fix but adds a session phase for little gain at current admin volume — not planned.
+
+### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FOUND LIVE (2026-10-05)
+
+**Witnessed live during QA case B2.** The opportunity `opp_1791280007760` was written to the
+sheet correctly, but the admin never saw *"Opportunity created!"*. Railway logs show why:
+
+```
+GrammyError: Call to 'sendMessage' failed!
+(400: Bad Request: can't parse entities: Can't find end of the entity starting at byte offset 150)
+payload.text: "Opportunity created!\n\n**Full-Stack Web3 Developer**\n…\nID: opp_1791280007760"
+payload.parse_mode: "Markdown"
+```
+
+Byte offset 150 is exactly the `_` in `opp_1791280007760`. Legacy Markdown reads `_` as
+*italics start*; every generated ID is `opp_<timestamp>` with exactly one underscore, so the
+entity never closes and Telegram rejects the **whole message** — deterministically, for every
+opportunity ever created (`admin.ts:102-111`). This is Appendix B issue 2's predicted failure
+mode, now proven live, and from a **static template**, not model output.
+
+**Success masquerades as failure** — the mirror image of §23/§25. The write lands, the receipt
+dies, and the natural admin reaction is to retry, creating duplicate roles. (During B2 the
+admin stopped to investigate instead; the sheet shows one row, no duplicate.)
+
+**Disposition:** Phase E, same family as Appendix B issue 2. Any message that interpolates
+IDs, rates, or model prose into `parse_mode: "Markdown"` has this bug; the fix is escaping or
+dropping parse_mode, not sprinkling more Markdown.
