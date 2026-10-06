@@ -62,8 +62,9 @@ export async function handleResolution(ctx: BotContext): Promise<void> {
   if ((action === "accept" || action === "walkaway") && ctx.session.pendingSupersedeId === agreementId) {
     const draftId = ctx.session.currentAgreementId;
     if (draftId && draftId !== agreementId) {
+      // Lineage: the draft lost to the standing offer it was exploring away from.
       await ctx.sheets
-        .updateAgreementStatus(draftId, "superseded")
+        .updateAgreementStatus(draftId, "superseded", agreementId)
         .catch((err) =>
           console.error(`handleResolution ${action}: could not retire revision draft ${draftId}:`, err)
         );

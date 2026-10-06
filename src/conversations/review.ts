@@ -154,7 +154,7 @@ export async function supersedePendingRevision(ctx: BotContext, submittedId: str
     ]);
     if (oldRow?.status !== "under_review") return;
     if (submitted && submitted.opportunityId !== oldRow.opportunityId) return;
-    await ctx.sheets.updateAgreementStatus(oldId, "superseded");
+    await ctx.sheets.updateAgreementStatus(oldId, "superseded", submittedId);
   } catch (err) {
     // Loud: a failed supersede leaves the old row's reviewer keyboards
     // answerable (ensureOpenForReview still passes) beside the live revision.

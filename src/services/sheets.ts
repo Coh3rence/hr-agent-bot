@@ -365,7 +365,17 @@ export class SheetsService {
     });
   }
 
-  async updateAgreementStatus(id: string, status: Agreement["status"]): Promise<boolean> {
+  /**
+   * `supersededBy` (column R, the next free one after Q=aggregatedCommitment)
+   * records WHICH agreement replaced this one — `superseded` alone says only
+   * that it died. Optional because a successor isn't always known at retirement
+   * time (a draft retired by review:modify: precedes its replacement's birth).
+   */
+  async updateAgreementStatus(
+    id: string,
+    status: Agreement["status"],
+    supersededBy?: string
+  ): Promise<boolean> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
       range: "Agreements!A2:L",
@@ -376,12 +386,25 @@ export class SheetsService {
     if (index === -1) return false;
 
     const rowNum = index + 2;
-    await this.sheets.spreadsheets.values.update({
-      spreadsheetId: this.spreadsheetId,
-      range: `Agreements!J${rowNum}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[status]] },
-    });
+    if (supersededBy === undefined) {
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: `Agreements!J${rowNum}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[status]] },
+      });
+    } else {
+      await this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: {
+          valueInputOption: "USER_ENTERED",
+          data: [
+            { range: `Agreements!J${rowNum}`, values: [[status]] },
+            { range: `Agreements!R${rowNum}`, values: [[supersededBy]] },
+          ],
+        },
+      });
+    }
     return true;
   }
 

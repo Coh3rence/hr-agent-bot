@@ -102,9 +102,9 @@ function supersedeCtx(opts: {
     sheets: {
       getAgreement: async (id: string) =>
         opts.rows[id] ? ({ id, ...opts.rows[id] } as Agreement) : null,
-      updateAgreementStatus: async (id: string, status: string) => {
+      updateAgreementStatus: async (id: string, status: string, supersededBy?: string) => {
         if (opts.failWrite) throw new Error("Sheets is down");
-        writes.push(`${id}:${status}`);
+        writes.push(supersededBy ? `${id}:${status}<-${supersededBy}` : `${id}:${status}`);
       },
     },
   } as unknown as BotContext;
@@ -123,7 +123,8 @@ describe("supersedePendingRevision", () => {
       },
     });
     await supersedePendingRevision(h.ctx, "a_new");
-    expect(h.writes).toEqual(["a_old:superseded"]);
+    // Lineage rides along: column R records what replaced the old row.
+    expect(h.writes).toEqual(["a_old:superseded<-a_new"]);
     expect(h.ctx.session.pendingSupersedeId).toBeNull();
   });
 

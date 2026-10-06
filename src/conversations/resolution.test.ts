@@ -121,8 +121,8 @@ function resolutionCtx(opts: {
       getReviewFeedbacks: async () => [],
       getCandidateOffer: async () => null,
       getContributorById: async () => opts.contributor ?? null,
-      updateAgreementStatus: async (id: string, status: string) => {
-        statusWrites.push(`${id}:${status}`);
+      updateAgreementStatus: async (id: string, status: string, supersededBy?: string) => {
+        statusWrites.push(supersededBy ? `${id}:${status}<-${supersededBy}` : `${id}:${status}`);
       },
       updateContributor: async () => {},
     },
@@ -231,7 +231,7 @@ describe("handleResolution — settling the standing offer retires the explorato
       currentAgreementId: "a_2",
     });
     await handleResolution(h.ctx);
-    expect(h.statusWrites).toEqual(["a_2:superseded", "a_1:approved"]);
+    expect(h.statusWrites).toEqual(["a_2:superseded<-a_1", "a_1:approved"]);
     expect(h.ctx.session.pendingSupersedeId).toBeNull();
   });
 
@@ -243,7 +243,7 @@ describe("handleResolution — settling the standing offer retires the explorato
       currentAgreementId: "a_2",
     });
     await handleResolution(h.ctx);
-    expect(h.statusWrites).toEqual(["a_2:superseded", "a_1:rejected"]);
+    expect(h.statusWrites).toEqual(["a_2:superseded<-a_1", "a_1:rejected"]);
     expect(h.ctx.session.pendingSupersedeId).toBeNull();
   });
 
