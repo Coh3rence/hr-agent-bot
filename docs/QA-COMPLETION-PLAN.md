@@ -192,11 +192,20 @@ Deploying restarts the bot, so these wait until Phase D is quiet. Railway's
 `railway up --service bot --ci` uploads the **working tree**, not a git ref —
 confirm any deploy by build timestamp, never by `git log`.
 
-- [ ] **Markdown** (Appendix B, issue 2)
-- [ ] **Reviewer DM revision context** (issue 3)
-- [ ] **Submit status guard** (issue 4)
-- [ ] **Agreements lineage column** (issue 5)
-- [ ] **§23 retire-on-commit** — approved (D-d, 2026-10-05); land after the submit guard
+All five are **written and committed locally (2026-10-06, 165 tests pass)** — the
+only remaining step is the deploy itself, gated on E6 resolving (no agreement may
+be `under_review` at restart).
+
+- [x] **Markdown** (Appendix B, issue 2) — commit `03a1ed7`; full audit write-up in
+      KNOWN-ISSUES §26
+- [x] **Reviewer DM revision context** (issue 3) — commit `e6dbd54`
+- [x] **Submit status guard** (issue 4) — commit `465a0a3`, KNOWN-ISSUES §24
+- [x] **Agreements lineage column** (issue 5) — commit `df642e3`; needs the one-time
+      `supersededBy` header write to `Agreements!R1` on the prod sheet at deploy
+- [x] **§23 retire-on-commit** — approved (D-d, 2026-10-05); commit `6ed1c34`,
+      landed after the submit guard as planned
+- [ ] **Deploy** after E6 escalates (Oct 8 ~14:21Z): `railway up --service bot --ci`,
+      verify by build timestamp, write `Agreements!R1`, ledger entry (REVERT vs KEEP)
 
 ---
 
@@ -254,15 +263,15 @@ blocking on.
 
 | # | Issue | Location | Disposition |
 |---|---|---|---|
-| 1 | **§23 — retire-on-tap.** Tapping Modify supersedes the agreement *before* any new terms are stated, so merely exploring a revision destroys the standing offer irrecoverably. Witnessed live 2026-09-28 | `resolution.ts:208` | Write-up Phase A; fix gated on decision D-d |
-| 2 | **Literal `**` reaches the user.** Model prose is sent with no `parse_mode`. Separately, `**bold**` never renders at any of the 11 existing `parse_mode` sites — Telegram legacy Markdown wants single `*`, so the asterisks are silently swallowed | `negotiation.ts:158`, `discovery.ts:189` | Phase E. **Naive `parse_mode: "Markdown"` is the wrong fix** — unbalanced `*` or `_` in model output raises a Telegram 400 `can't parse entities` and the entire message is dropped. **Proven live 2026-10-05 (§26):** every `/add_opportunity` confirmation dies this way — the `_` in `opp_<timestamp>` is an unclosed entity, from a static template |
-| 3 | **Reviewer DM carries no revision context** — rendered from the agreement row alone: no round number, no prior terms, no indication it is a revision. Made two DMs character-for-character identical on 2026-09-09 | `notifyReviewers`, `review.ts:352` | Phase E. Amplifies issue 1 |
-| 4 | **`review:submit:` has no status guard.** Every other callback path was hardened — `ensureOpenForReview` for reviewer taps (§14), the candidate-side check in `handleResolution` (§19) — but submit writes `under_review` unconditionally. A tap on a stale draft's Submit button resurrects a dead row and DMs reviewers withdrawn terms: the §14 hazard arriving through the one door left open. Found 2026-10-02, not reproduced live | `review.ts:19-21` | Phase E. Mitigated only by `review:modify:` stripping the keyboard of the draft it retires, so the exposure is drafts retired by other routes |
-| 5 | **No lineage column** on Agreements — `superseded` records *that* a row died, not what replaced it, so the sheet cannot show that one proposal superseded another | Agreements tab | Phase E |
+| 1 | **§23 — retire-on-tap.** Tapping Modify supersedes the agreement *before* any new terms are stated, so merely exploring a revision destroys the standing offer irrecoverably. Witnessed live 2026-09-28 | `resolution.ts:208` | **FIXED IN CODE 2026-10-06** (commit `6ed1c34`, D-d approved), awaiting Phase E deploy |
+| 2 | **Literal `**` reaches the user.** Model prose is sent with no `parse_mode`. Separately, `**bold**` never renders at any of the 11 existing `parse_mode` sites — Telegram legacy Markdown wants single `*`, so the asterisks are silently swallowed | `negotiation.ts:158`, `discovery.ts:189` | Phase E. **Naive `parse_mode: "Markdown"` is the wrong fix** — unbalanced `*` or `_` in model output raises a Telegram 400 `can't parse entities` and the entire message is dropped. **Proven live 2026-10-05 (§26):** every `/add_opportunity` confirmation dies this way — the `_` in `opp_<timestamp>` is an unclosed entity, from a static template. **FIXED IN CODE 2026-10-06** (commit `03a1ed7`, full audit in KNOWN-ISSUES §26), awaiting Phase E deploy |
+| 3 | **Reviewer DM carries no revision context** — rendered from the agreement row alone: no round number, no prior terms, no indication it is a revision. Made two DMs character-for-character identical on 2026-09-09 | `notifyReviewers`, `review.ts:352` | **FIXED IN CODE 2026-10-06** (commit `e6dbd54`: round N of M in the title, prior ask + reviewer counters in the body), awaiting Phase E deploy |
+| 4 | **`review:submit:` has no status guard.** Every other callback path was hardened — `ensureOpenForReview` for reviewer taps (§14), the candidate-side check in `handleResolution` (§19) — but submit writes `under_review` unconditionally. A tap on a stale draft's Submit button resurrects a dead row and DMs reviewers withdrawn terms: the §14 hazard arriving through the one door left open. Found 2026-10-02, not reproduced live | `review.ts:19-21` | **FIXED IN CODE 2026-10-06** (commit `465a0a3`, `ensureSubmittable` — KNOWN-ISSUES §24), awaiting Phase E deploy |
+| 5 | **No lineage column** on Agreements — `superseded` records *that* a row died, not what replaced it, so the sheet cannot show that one proposal superseded another | Agreements tab | **FIXED IN CODE 2026-10-06** (commit `df642e3`, column R `supersededBy`), awaiting Phase E deploy + the one-time `R1` header write |
 | 6 | **Section B premise unproven** — identical seeded `createdAt` values are mild evidence against the client-facing claim that all changes go through the bot | `QA-VERIFICATION.md:71` | Closed by Phase B |
 | 7 | **Ledger K7 is factually wrong** — states neither reviewer had responded at the §22 deploy; Gustavo countered 9h before the build | `QA-REVERT-LEDGER.md` | Phase A |
 | 8 | **All 32 Result columns blank** — the bookkeeping failure that made a finished section G look unstarted and misdirected the campaign | `QA-VERIFICATION.md` | Phase A, gated on D-b |
-| 9 | **Every opportunity edit fails, and the retry would have corrupted data (§27).** Schema drift: the sheet has 11 columns, the code writes 12 → Google 400 on every `/edit_opportunity` and `/pause_opportunity`, uncaught, silent. Separately the partial-edit merge rebuilds ranges with `\|\| 0` defaults — "raise max to 80" carried `hourlyRateMin: 0`. **Proven live 2026-10-06; B3 FAILED, B4 blocked** | `sheets.ts:115-132`, `admin.ts:190-200` | **Must fix before B3/B4/§19-reopen can run** — the one defect that blocks live cases rather than merely annoying them. Fix both halves together in Phase E (pulled forward to 2026-10-06) |
+| 9 | **Every opportunity edit fails, and the retry would have corrupted data (§27).** Schema drift: the sheet has 11 columns, the code writes 12 → Google 400 on every `/edit_opportunity` and `/pause_opportunity`, uncaught, silent. Separately the partial-edit merge rebuilds ranges with `\|\| 0` defaults — "raise max to 80" carried `hourlyRateMin: 0`. **Proven live 2026-10-06; B3 FAILED, B4 blocked** | `sheets.ts:115-132`, `admin.ts:190-200` | **FIXED AND DEPLOYED 2026-10-06** (build `2026-10-06T12:30:21Z`, ledger K8) — both halves together: 11-column write path + merge-against-base-row. B3/B4/§19-reopen unblocked |
 
 ---
 

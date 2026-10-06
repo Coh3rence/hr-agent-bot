@@ -856,7 +856,7 @@ The one-shot branch works correctly (Claude tool-use extraction, `admin.ts:73-11
 requirement and stops promising a step-by-step mode. An admin collection phase would be the
 full fix but adds a session phase for little gain at current admin volume — not planned.
 
-### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FIXED AT THE PROVEN SITE, DEPLOYED 2026-10-06 (K8; the full parse_mode audit remains Phase E)
+### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FIXED AT THE PROVEN SITE, DEPLOYED 2026-10-06 (K8); FULL AUDIT FIXED IN CODE 2026-10-06, awaiting Phase E deploy
 
 **Witnessed live during QA case B2.** The opportunity `opp_1791280007760` was written to the
 sheet correctly, but the admin never saw *"Opportunity created!"*. Railway logs show why:
@@ -881,6 +881,27 @@ admin stopped to investigate instead; the sheet shows one row, no duplicate.)
 **Disposition:** Phase E, same family as Appendix B issue 2. Any message that interpolates
 IDs, rates, or model prose into `parse_mode: "Markdown"` has this bug; the fix is escaping or
 dropping parse_mode, not sprinkling more Markdown.
+
+**Full audit completed in code 2026-10-06 (Phase E batch).** Every send site was classified:
+
+- **Free-text interpolation (names, titles, skills, IDs) → parse_mode dropped,
+  labels de-bolded**: admin list (`admin.ts`), gate access-request DM, welcome-back
+  profile and match list (`gate.ts`), discovery profile confirmation and match list
+  (`discovery.ts`), negotiation role-selected message and proposal summary
+  (`negotiation.ts`). Keyboards are untouched — `reply_markup` is independent of
+  parse_mode.
+- **Model prose → `stripBoldMarkers()`** (new export in `services/presentation.ts`,
+  unit-tested): Claude dresses prose in `**bold**`, which legacy Markdown never
+  rendered anyway; without parse_mode the markers would arrive as literal
+  asterisks. Applied to the three `qualitativeSummary` sites in `presentation.ts`,
+  the match explanations in `gate.ts`/`discovery.ts`, and the free-chat replies in
+  `discovery.ts`/`negotiation.ts`.
+- **Static, balanced templates → parse_mode KEPT** (intentional): `review.ts:76`
+  and `review.ts:~270` — no interpolated free text inside an entity, backticks
+  balanced by construction.
+
+The resulting policy: parse_mode only on fully-static balanced templates;
+everything that interpolates user/model/sheet text goes out as plain text.
 
 ### 27. Every opportunity edit fails — 12 values into an 11-column range — and the retry would have wiped the rate minimum — FIXED, DEPLOYED 2026-10-06 (build `2026-10-06T12:30:21Z`, K8)
 
