@@ -2,6 +2,7 @@ import type { BotContext } from "../bot";
 import { calculateSettlementLikelihood } from "../services/matching";
 import type { Agreement } from "../models/types";
 import { InlineKeyboard } from "grammy";
+import { stripBoldMarkers } from "../services/presentation";
 
 const NEGOTIATION_SYSTEM_PROMPT = `You are an HR assistant helping structure an agreement between a contributor and Collabberry. Extract negotiation parameters from the conversation:
 - hourly rate proposed
@@ -52,9 +53,10 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       return;
     }
 
+    // §26: no parse_mode — the title is free text; an unbalanced entity in it
+    // would make Telegram reject the whole message.
     await ctx.reply(
-      `You've selected **${opp.title}**.\n\nNow let's discuss the terms. Please propose:\n\n1. Your hourly rate (budget range is not disclosed)\n2. Your commitment % (e.g., 50% = ~20hrs/week)\n3. Preferred duration (in months)\n\nYou can share these all at once or we can discuss each one.`,
-      { parse_mode: "Markdown" }
+      `You've selected ${opp.title}.\n\nNow let's discuss the terms. Please propose:\n\n1. Your hourly rate (budget range is not disclosed)\n2. Your commitment % (e.g., 50% = ~20hrs/week)\n3. Preferred duration (in months)\n\nYou can share these all at once or we can discuss each one.`
     );
     return;
   }
@@ -142,19 +144,21 @@ export async function handleNegotiation(ctx: BotContext): Promise<void> {
       .row()
       .text("Modify Terms", `review:modify:${agreement.id}`);
 
+    // §26: no parse_mode — the role title is free text; an unbalanced entity in
+    // it would make Telegram reject the whole summary.
     await ctx.reply(
       `Here's your proposed agreement:\n\n` +
-        `**Role:** ${opp.title}\n` +
-        `**Rate:** $${extracted.hourlyRate}/hr\n` +
-        `**Commitment:** ${agreement.commitmentPercent}%\n` +
-        `**Duration:** ${agreement.durationMonths} months\n` +
-        `**Settlement Likelihood:** ${likelihood}% (${likelihoodLabel})\n\n` +
+        `Role: ${opp.title}\n` +
+        `Rate: $${extracted.hourlyRate}/hr\n` +
+        `Commitment: ${agreement.commitmentPercent}%\n` +
+        `Duration: ${agreement.durationMonths} months\n` +
+        `Settlement Likelihood: ${likelihood}% (${likelihoodLabel})\n\n` +
         `Would you like to submit this for review by the core team, or modify the terms?`,
-      { parse_mode: "Markdown", reply_markup: keyboard }
+      { reply_markup: keyboard }
     );
   } else {
     const response = await ctx.claude.chat(systemPrompt, ctx.session.messageHistory);
     ctx.session.messageHistory.push({ role: "assistant", content: response });
-    await ctx.reply(response);
+    await ctx.reply(stripBoldMarkers(response));
   }
 }

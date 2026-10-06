@@ -135,17 +135,19 @@ export async function handleListOpportunities(ctx: BotContext): Promise<void> {
     return;
   }
 
-  let message = "**Current Opportunities:**\n\n";
+  // §26: no parse_mode — titles and skills are free text, and one stray
+  // underscore or asterisk would make Telegram reject the whole list.
+  let message = "Current Opportunities:\n\n";
   for (const opp of opportunities) {
     const statusEmoji =
       opp.status === "open" ? "🟢" : opp.status === "paused" ? "🟡" : "🔴";
-    message += `${statusEmoji} **${opp.title}** (${opp.status})\n`;
+    message += `${statusEmoji} ${opp.title} (${opp.status})\n`;
     message += `Skills: ${opp.skillsRequired.join(", ")}\n`;
     message += `Commitment: ${opp.commitmentPercent.min}-${opp.commitmentPercent.max}% | Rate: $${opp.hourlyRate.min}-${opp.hourlyRate.max}/hr\n`;
-    message += `ID: \`${opp.id}\`\n\n`;
+    message += `ID: ${opp.id}\n\n`;
   }
 
-  await ctx.reply(message, { parse_mode: "Markdown" });
+  await ctx.reply(message);
 }
 
 export async function handleEditOpportunity(ctx: BotContext): Promise<void> {

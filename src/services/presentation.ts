@@ -26,6 +26,17 @@ export interface Notifier {
   ): Promise<unknown>;
 }
 
+/**
+ * §26 companion: Claude prose arrives dressed in `**bold**`. These messages are
+ * sent without parse_mode — an unbalanced entity makes Telegram drop the WHOLE
+ * message, and model output can't be trusted to balance them — so the markers
+ * would reach the user as literal asterisks. Strip them instead. (Telegram's
+ * legacy Markdown wants single `*` anyway; `**` never rendered as bold.)
+ */
+export function stripBoldMarkers(text: string): string {
+  return text.replaceAll("**", "");
+}
+
 export async function presentToCandidate(
   agreementId: string,
   sheets: SheetsService,
@@ -62,7 +73,7 @@ export async function presentToCandidate(
     const message =
       `Your proposal has been reviewed.\n\n` +
       `Role: ${agreement.roleName}\n\n` +
-      `${offer.qualitativeSummary}\n\n` +
+      `${stripBoldMarkers(offer.qualitativeSummary)}\n\n` +
       `Thank you for your time — we won't be moving forward with this one. ` +
       `You're welcome to apply again after a ${COOLDOWN_DAYS}-day reflection period.`;
 
@@ -91,7 +102,7 @@ export async function presentToCandidate(
     const message =
       `Your proposal has been reviewed.\n\n` +
       `Role: ${agreement.roleName}\n\n` +
-      `${offer.qualitativeSummary}\n\n` +
+      `${stripBoldMarkers(offer.qualitativeSummary)}\n\n` +
       `The reviewers haven't put specific numbers on the table, so there's no revised ` +
       `offer for you to accept yet. Would you like to revise your terms?`;
 
@@ -119,7 +130,7 @@ export async function presentToCandidate(
     `Your proposal has been reviewed.\n\n` +
     `Role: ${agreement.roleName}\n` +
     `${rateLine}${commitmentLine}\n\n` +
-    `${offer.qualitativeSummary}\n\n` +
+    `${stripBoldMarkers(offer.qualitativeSummary)}\n\n` +
     `How would you like to proceed?`;
 
   const keyboard = new InlineKeyboard()

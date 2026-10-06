@@ -1,5 +1,6 @@
 import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
+import { stripBoldMarkers } from "../services/presentation";
 
 export async function handleGate(ctx: BotContext): Promise<void> {
   const telegramId = ctx.from?.id?.toString();
@@ -26,14 +27,17 @@ export async function handleGate(ctx: BotContext): Promise<void> {
 
     for (const adminId of adminIds) {
       try {
+        // §26: no parse_mode — the requester controls their own name and
+        // username, and an underscore in either (common in handles) would make
+        // Telegram reject the DM, so the admin never sees the access request.
         await ctx.api.sendMessage(
           adminId,
           `New access request:\n\n` +
             `Name: ${name}\n` +
             `Username: ${handle}\n` +
-            `ID: \`${telegramId}\`\n\n` +
+            `ID: ${telegramId}\n\n` +
             `Authorize this user?`,
-          { parse_mode: "Markdown", reply_markup: keyboard }
+          { reply_markup: keyboard }
         );
       } catch {
         // Admin may not have started a DM with the bot yet
@@ -68,12 +72,11 @@ export async function handleGate(ctx: BotContext): Promise<void> {
 
     await ctx.reply(
       `Welcome back, ${existing.name}!\n\n` +
-        `**Your profile:**\n` +
+        `Your profile:\n` +
         `Skills: ${existing.skills.join(", ")}\n` +
         `Rate: ${rateStr}\n` +
         `Commitment: ${existing.commitmentPercent}%\n\n` +
-        `Finding the best opportunities for you...`,
-      { parse_mode: "Markdown" }
+        `Finding the best opportunities for you...`
     );
 
     // Run AI matching
@@ -93,6 +96,8 @@ export async function handleGate(ctx: BotContext): Promise<void> {
     }
 
     const topMatches = matches.slice(0, 3);
+    // §26: no parse_mode — titles and skills are free text, and the explanation is
+    // model prose; one unbalanced entity would make Telegram reject the whole list.
     let message = `Here are your top matches:\n\n`;
     const keyboard = new InlineKeyboard();
 
@@ -100,7 +105,7 @@ export async function handleGate(ctx: BotContext): Promise<void> {
       const m = match as typeof match & { matchingSkills?: string[]; missingSkills?: string[] };
       const badge = match.score >= 75 ? "🟢" : match.score >= 50 ? "🟡" : "🔴";
 
-      message += `${badge} **${match.opportunity.title}** — ${match.score}% match\n`;
+      message += `${badge} ${match.opportunity.title} — ${match.score}% match\n`;
 
       if (m.matchingSkills?.length) {
         message += `Relevant skills: ${m.matchingSkills.join(", ")}\n`;
@@ -109,7 +114,7 @@ export async function handleGate(ctx: BotContext): Promise<void> {
         message += `Could improve: ${m.missingSkills.join(", ")}\n`;
       }
 
-      message += `${match.explanation}\n\n`;
+      message += `${stripBoldMarkers(match.explanation)}\n\n`;
 
       keyboard
         .text(
@@ -122,7 +127,7 @@ export async function handleGate(ctx: BotContext): Promise<void> {
     message += "Select an opportunity to start negotiating terms:";
     ctx.session.phase = "matching";
 
-    await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
+    await ctx.reply(message, { reply_markup: keyboard });
     return;
   }
 

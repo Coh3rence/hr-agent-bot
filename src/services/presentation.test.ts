@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { InlineKeyboard } from "grammy";
 import type { Agreement, Contributor, ReviewerFeedback } from "../models/types";
-import { presentToCandidate, type Notifier } from "./presentation";
+import { presentToCandidate, stripBoldMarkers, type Notifier } from "./presentation";
 import type { SheetsService } from "./sheets";
 
 function feedback(reviewerId: string, decision: ReviewerFeedback["decision"]): ReviewerFeedback {
@@ -167,5 +167,26 @@ describe("presentToCandidate — an offer still on the table", () => {
     expect(await presentToCandidate("a_1", h.sheets, h.notifier)).toBe(true);
     expect(await presentToCandidate("a_1", h.sheets, h.notifier)).toBe(false);
     expect(h.sent).toHaveLength(1);
+  });
+});
+
+// §26: these messages go out without parse_mode, so Claude's `**bold**` would
+// reach the user as literal asterisks. Strip the markers; leave everything else.
+describe("stripBoldMarkers", () => {
+  test("removes double-asterisk pairs", () => {
+    expect(stripBoldMarkers("The **rate** looks **fair**.")).toBe("The rate looks fair.");
+  });
+
+  test("removes an unbalanced marker too — half a marker still renders as noise", () => {
+    expect(stripBoldMarkers("A **dangling marker")).toBe("A dangling marker");
+  });
+
+  test("leaves single asterisks alone (multiplication, footnotes)", () => {
+    expect(stripBoldMarkers("40 * 0.5 = 20 hrs*")).toBe("40 * 0.5 = 20 hrs*");
+  });
+
+  test("plain prose passes through untouched", () => {
+    const text = "Rate: $45/hr, commitment 50%.";
+    expect(stripBoldMarkers(text)).toBe(text);
   });
 });

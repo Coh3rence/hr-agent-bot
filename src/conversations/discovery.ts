@@ -1,6 +1,7 @@
 import type { BotContext } from "../bot";
 import { InlineKeyboard } from "grammy";
 import type { Contributor } from "../models/types";
+import { stripBoldMarkers } from "../services/presentation";
 
 const DISCOVERY_SYSTEM_PROMPT = `You are an HR assistant for Collabberry, a DAO compensation platform. You're collecting information about a new contributor through natural conversation. Extract the following fields when mentioned:
 - name
@@ -115,14 +116,15 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
       ? `$${contributor.desiredRate.min}/hr`
       : `$${contributor.desiredRate.min}-${contributor.desiredRate.max}/hr`;
 
+    // §26: no parse_mode — name, skills and location are free text; one stray
+    // underscore or asterisk would make Telegram reject the whole message.
     await ctx.reply(
       `Got it, ${contributor.name}! Here's your profile:\n\n` +
-        `**Skills:** ${contributor.skills.join(", ")}\n` +
-        `**Rate:** ${rateStr}\n` +
-        `**Commitment:** ${contributor.commitmentPercent}%\n` +
-        `**Location:** ${contributor.location} (${contributor.timezone})\n\n` +
-        `Finding the best opportunities for you...`,
-      { parse_mode: "Markdown" }
+        `Skills: ${contributor.skills.join(", ")}\n` +
+        `Rate: ${rateStr}\n` +
+        `Commitment: ${contributor.commitmentPercent}%\n` +
+        `Location: ${contributor.location} (${contributor.timezone})\n\n` +
+        `Finding the best opportunities for you...`
     );
 
     // Run AI-powered matching
@@ -147,7 +149,9 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
 
     const topMatches = matches.slice(0, 3);
 
-    // Build opportunity cards with AI explanations
+    // Build opportunity cards with AI explanations.
+    // §26: no parse_mode — titles and skills are free text, and the explanation is
+    // model prose; one unbalanced entity would make Telegram reject the whole list.
     let message = `Here are your top matches:\n\n`;
     const keyboard = new InlineKeyboard();
 
@@ -156,7 +160,7 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
       const badge =
         match.score >= 75 ? "🟢" : match.score >= 50 ? "🟡" : "🔴";
 
-      message += `${badge} **${match.opportunity.title}** — ${match.score}% match\n`;
+      message += `${badge} ${match.opportunity.title} — ${match.score}% match\n`;
 
       if (m.matchingSkills?.length) {
         message += `Relevant skills: ${m.matchingSkills.join(", ")}\n`;
@@ -165,7 +169,7 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
         message += `Could improve: ${m.missingSkills.join(", ")}\n`;
       }
 
-      message += `${match.explanation}\n\n`;
+      message += `${stripBoldMarkers(match.explanation)}\n\n`;
 
       keyboard
         .text(
@@ -178,7 +182,7 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
     message += "Select an opportunity to start negotiating terms:";
     ctx.session.phase = "matching";
 
-    await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
+    await ctx.reply(message, { reply_markup: keyboard });
   } else {
     // Continue conversation to collect missing info
     const response = await ctx.claude.chat(DISCOVERY_SYSTEM_PROMPT, ctx.session.messageHistory);
@@ -186,6 +190,6 @@ export async function handleDiscovery(ctx: BotContext): Promise<void> {
       [...ctx.session.messageHistory, { role: "assistant" as const, content: response }],
       ctx.config.SESSION_HISTORY_LIMIT
     );
-    await ctx.reply(response);
+    await ctx.reply(stripBoldMarkers(response));
   }
 }
