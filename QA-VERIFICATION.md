@@ -80,7 +80,7 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 | B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | **PASS** (2026-10-05) | All three seeded roles returned with commitment, budget and status |
 | B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | **PASS** (2026-10-05) | `opp_1791280007760` "Full-Stack Web3 Developer" written to Opportunities sheet, status open. Two defects found live: bare command is a dead end (§25); confirmation reply dropped by Telegram Markdown 400 (§26) — the write succeeded regardless |
 | B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | **FAIL** (2026-10-06) | First failure of the campaign. Google 400 `tried writing to column [L]` — 12 values written into the 11-column sheet, every edit fails silently; the attempted payload also carried `hourlyRateMin: 0` (§27, both defects). Sheet verified unchanged. Re-run after the §27 fix deploys |
-| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | **Blocked by §27** | Same `updateOpportunity` write path as B3 — will fail identically until the fix deploys. Not attempted, to avoid noise |
+| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | **PASS** (2026-10-06) | `opp_1791280007760` paused at ~12:38Z, 8 min after the K8 fix deployed — first successful `updateOpportunity` write ever. Confirmation reply arrived; `/list_opportunities` shows 🟡 paused. Run out of order (before B3/E6), so the role was reopened afterwards via `status open` |
 
 ### C — Contributor discovery and matching
 
