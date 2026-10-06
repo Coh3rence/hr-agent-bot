@@ -79,8 +79,8 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 |---|---|---|---|---|---|
 | B1 | List opportunities | `/list_opportunities` | Current roles returned with budget and status | **PASS** (2026-10-05) | All three seeded roles returned with commitment, budget and status |
 | B2 | Create opportunity | `/add_opportunity`, follow prompts | New role appears in B1 and in the sheet | **PASS** (2026-10-05) | `opp_1791280007760` "Full-Stack Web3 Developer" written to Opportunities sheet, status open. Two defects found live: bare command is a dead end (§25); confirmation reply dropped by Telegram Markdown 400 (§26) — the write succeeded regardless |
-| B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | **FAIL** (2026-10-06) | First failure of the campaign. Google 400 `tried writing to column [L]` — 12 values written into the 11-column sheet, every edit fails silently; the attempted payload also carried `hourlyRateMin: 0` (§27, both defects). Sheet verified unchanged. Re-run after the §27 fix deploys |
-| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | **PASS** (2026-10-06) | `opp_1791280007760` paused at ~12:38Z, 8 min after the K8 fix deployed — first successful `updateOpportunity` write ever. Confirmation reply arrived; `/list_opportunities` shows 🟡 paused. Run out of order (before B3/E6), so the role was reopened afterwards via `status open` |
+| B3 | Edit opportunity | `/edit_opportunity` | Change persists and is reflected in B1 | **PASS** (2026-10-06, after fix) | First attempt FAILED 2026-10-06 ~10:10Z (§27: Google 400, 12 values into 11 columns; payload also carried `hourlyRateMin: 0`). K8 fix deployed `12:30:21Z`; re-run ~13:19Z: max 75→80 persisted **with min kept at 50**, and a `status open` edit reopened the paused role — the reopen path §27 also unblocked |
+| B4 | Pause opportunity | `/pause_opportunity` | Role stops being offered to new contributors | **PASS** (2026-10-06) | `opp_1791280007760` paused at ~12:38Z, 8 min after the K8 fix deployed — first successful `updateOpportunity` write ever. Confirmation reply arrived; `/list_opportunities` showed 🟡 paused, and a `/start` match run while paused offered only the 3 seeded roles — the paused role was excluded. Reopened afterwards via `status open` (run out of order, before B3/E6) |
 
 ### C — Contributor discovery and matching
 
@@ -162,7 +162,7 @@ Configuration that is deliberately relaxed for testing and must be tightened bef
 
 ## 7. Outcome
 
-**Tests passed:** 18 / 32 proven as of 2026-10-06 — **1 failure**: B3 (`/edit_opportunity` broken in production, §27; B4 blocked by the same defect); the remaining 12 are scheduled (see `docs/QA-COMPLETION-PLAN.md`)
+**Tests passed:** 20 / 32 proven as of 2026-10-06 — B3 failed on first run (§27), the fix deployed same day (K8) and the re-run passed; no open failures. The remaining 12 are scheduled (see `docs/QA-COMPLETION-PLAN.md`)
 **Failures / follow-ups:**
 
 | ID | Issue | Severity | Owner | Action |
