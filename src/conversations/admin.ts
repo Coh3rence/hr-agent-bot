@@ -1,5 +1,6 @@
 import type { BotContext } from "../bot";
 import type { Opportunity } from "../models/types";
+import type { OpportunityUpdate } from "../services/sheets";
 
 const ADD_OPP_SYSTEM_PROMPT = `You are an HR assistant helping an admin create a new job opportunity. Extract these fields from the conversation:
 - title (role name)
@@ -22,6 +23,7 @@ const OPP_TOOL_SCHEMA = {
     hourlyRateMin: { type: "number" },
     hourlyRateMax: { type: "number" },
     responsibilities: { type: "string" },
+    status: { type: "string", enum: ["open", "paused", "filled"] },
     isComplete: { type: "boolean" },
   },
   required: ["isComplete"],
@@ -36,6 +38,7 @@ interface ExtractedOpportunity {
   hourlyRateMin?: number;
   hourlyRateMax?: number;
   responsibilities?: string;
+  status?: string;
   isComplete: boolean;
 }
 
@@ -53,19 +56,18 @@ export async function handleAddOpportunity(ctx: BotContext): Promise<void> {
   const text = ctx.message?.text?.replace("/add_opportunity", "").trim();
 
   if (!text) {
+    // §25: there is no step-by-step mode — a follow-up message routes through the
+    // contributor gate. Everything must come in one message with the command.
     await ctx.reply(
-      "Let's create a new opportunity. You can provide all details at once or I'll ask step by step.\n\n" +
-        "Please provide:\n" +
+      "To create an opportunity, send ONE message starting with /add_opportunity followed by all details:\n" +
         "- Role title\n" +
         "- Description\n" +
         "- Required skills\n" +
         "- Commitment range (e.g., 20-50%)\n" +
         "- Budget range ($/hr)\n" +
         "- Responsibilities\n\n" +
-        'Example: "Governance Developer - Need someone with Solidity and governance experience, 30-50% commitment, $60-80/hr, responsible for writing and auditing governance contracts"'
+        'Example: "/add_opportunity Governance Developer - Need someone with Solidity and governance experience, 30-50% commitment, $60-80/hr, responsible for writing and auditing governance contracts"'
     );
-    // Set phase to collect opportunity data in next message
-    ctx.session.phase = "idle"; // Admin flow handled separately
     return;
   }
 
@@ -94,20 +96,20 @@ export async function handleAddOpportunity(ctx: BotContext): Promise<void> {
       responsibilities: extracted.responsibilities || "",
       status: "open",
       createdBy: telegramId,
-      createdAt: new Date().toISOString(),
     };
 
     await ctx.sheets.addOpportunity(opp);
 
+    // §26: no parse_mode — the id's underscore is an unclosed Markdown entity and
+    // Telegram rejects the whole message, eating the receipt for a successful write.
     await ctx.reply(
       `Opportunity created!\n\n` +
-        `**${opp.title}**\n` +
+        `${opp.title}\n` +
         `Skills: ${opp.skillsRequired.join(", ")}\n` +
         `Commitment: ${opp.commitmentPercent.min}-${opp.commitmentPercent.max}%\n` +
         `Budget: $${opp.hourlyRate.min}-${opp.hourlyRate.max}/hr\n` +
         `Status: Open\n` +
-        `ID: ${opp.id}`,
-      { parse_mode: "Markdown" }
+        `ID: ${opp.id}`
     );
   } else {
     await ctx.reply(
@@ -182,31 +184,50 @@ export async function handleEditOpportunity(ctx: BotContext): Promise<void> {
     OPP_TOOL_SCHEMA
   );
 
-  if (extracted) {
-    const updates: Partial<Opportunity> = {};
-    if (extracted.title) updates.title = extracted.title;
-    if (extracted.description) updates.description = extracted.description;
-    if (extracted.skillsRequired) updates.skillsRequired = extracted.skillsRequired;
-    if (extracted.hourlyRateMin || extracted.hourlyRateMax) {
-      updates.hourlyRate = {
-        min: extracted.hourlyRateMin || 0,
-        max: extracted.hourlyRateMax || 0,
-      };
-    }
-    if (extracted.commitmentPercentMin || extracted.commitmentPercentMax) {
-      updates.commitmentPercent = {
-        min: extracted.commitmentPercentMin || 0,
-        max: extracted.commitmentPercentMax || 100,
-      };
-    }
-    if (extracted.responsibilities) updates.responsibilities = extracted.responsibilities;
+  if (!extracted) {
+    await ctx.reply("I couldn't understand those changes. Nothing was modified.");
+    return;
+  }
 
-    const success = await ctx.sheets.updateOpportunity(oppId, updates);
-    if (success) {
-      await ctx.reply(`Opportunity ${oppId} updated successfully.`);
-    } else {
-      await ctx.reply(`Opportunity ${oppId} not found.`);
-    }
+  const updates: OpportunityUpdate = {};
+  if (extracted.title) updates.title = extracted.title;
+  if (extracted.description) updates.description = extracted.description;
+  if (extracted.skillsRequired) updates.skillsRequired = extracted.skillsRequired;
+
+  const hourlyRate: OpportunityUpdate["hourlyRate"] = {};
+  if (extracted.hourlyRateMin !== undefined) hourlyRate.min = extracted.hourlyRateMin;
+  if (extracted.hourlyRateMax !== undefined) hourlyRate.max = extracted.hourlyRateMax;
+  if (Object.keys(hourlyRate).length > 0) updates.hourlyRate = hourlyRate;
+
+  const commitmentPercent: OpportunityUpdate["commitmentPercent"] = {};
+  if (extracted.commitmentPercentMin !== undefined)
+    commitmentPercent.min = extracted.commitmentPercentMin;
+  if (extracted.commitmentPercentMax !== undefined)
+    commitmentPercent.max = extracted.commitmentPercentMax;
+  if (Object.keys(commitmentPercent).length > 0) updates.commitmentPercent = commitmentPercent;
+
+  if (extracted.responsibilities) updates.responsibilities = extracted.responsibilities;
+  if (extracted.status === "open" || extracted.status === "paused" || extracted.status === "filled") {
+    updates.status = extracted.status;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    await ctx.reply("I couldn't find any changes to apply in that request. Nothing was modified.");
+    return;
+  }
+
+  let success: boolean;
+  try {
+    success = await ctx.sheets.updateOpportunity(oppId, updates);
+  } catch (err) {
+    console.error("updateOpportunity failed:", err);
+    await ctx.reply(`Saving the change to ${oppId} failed — nothing was modified.`);
+    return;
+  }
+  if (success) {
+    await ctx.reply(`Opportunity ${oppId} updated successfully.`);
+  } else {
+    await ctx.reply(`Opportunity ${oppId} not found.`);
   }
 }
 
@@ -226,7 +247,14 @@ export async function handlePauseOpportunity(ctx: BotContext): Promise<void> {
     return;
   }
 
-  const success = await ctx.sheets.updateOpportunity(oppId, { status: "paused" });
+  let success: boolean;
+  try {
+    success = await ctx.sheets.updateOpportunity(oppId, { status: "paused" });
+  } catch (err) {
+    console.error("updateOpportunity failed:", err);
+    await ctx.reply(`Pausing ${oppId} failed — nothing was modified.`);
+    return;
+  }
   if (success) {
     await ctx.reply(`Opportunity ${oppId} has been paused. Use /edit_opportunity ${oppId} status open to reopen it.`);
   } else {

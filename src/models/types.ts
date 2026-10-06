@@ -8,7 +8,6 @@ export interface Opportunity {
   responsibilities: string;
   status: "open" | "filled" | "paused";
   createdBy: string; // Telegram user ID of admin
-  createdAt: string;
 }
 
 export interface Contributor {

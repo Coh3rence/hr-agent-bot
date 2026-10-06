@@ -28,6 +28,39 @@ export function nextRoundFromHistory(
   return consumed + 1;
 }
 
+/** Nested ranges accept partial updates so "raise the max" cannot zero the min (§27). */
+export type OpportunityUpdate = Partial<Omit<Opportunity, "hourlyRate" | "commitmentPercent">> & {
+  hourlyRate?: Partial<Opportunity["hourlyRate"]>;
+  commitmentPercent?: Partial<Opportunity["commitmentPercent"]>;
+};
+
+// The Opportunities tab has exactly 11 columns, A:K — there is no createdAt
+// column; writing a 12th value makes Google reject the whole row (§27).
+export function opportunityToRow(opp: Opportunity): (string | number)[] {
+  return [
+    opp.id,
+    opp.title,
+    opp.description,
+    opp.skillsRequired.join(", "),
+    opp.commitmentPercent.min,
+    opp.commitmentPercent.max,
+    opp.hourlyRate.min,
+    opp.hourlyRate.max,
+    opp.responsibilities,
+    opp.status,
+    opp.createdBy,
+  ];
+}
+
+export function mergeOpportunity(base: Opportunity, updates: OpportunityUpdate): Opportunity {
+  return {
+    ...base,
+    ...updates,
+    commitmentPercent: { ...base.commitmentPercent, ...updates.commitmentPercent },
+    hourlyRate: { ...base.hourlyRate, ...updates.hourlyRate },
+  };
+}
+
 export class SheetsService {
   private sheets!: sheets_v4.Sheets;
   private spreadsheetId: string;
@@ -66,7 +99,6 @@ export class SheetsService {
       responsibilities: row[8] || "",
       status: row[9] as Opportunity["status"],
       createdBy: row[10] || "",
-      createdAt: row[11] || "",
     }));
   }
 
@@ -81,33 +113,18 @@ export class SheetsService {
       range: "Opportunities!A:K",
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            opp.id,
-            opp.title,
-            opp.description,
-            opp.skillsRequired.join(", "),
-            opp.commitmentPercent.min,
-            opp.commitmentPercent.max,
-            opp.hourlyRate.min,
-            opp.hourlyRate.max,
-            opp.responsibilities,
-            opp.status,
-            opp.createdBy,
-            opp.createdAt,
-          ],
-        ],
+        values: [opportunityToRow(opp)],
       },
     });
   }
 
-  async updateOpportunity(id: string, updates: Partial<Opportunity>): Promise<boolean> {
+  async updateOpportunity(id: string, updates: OpportunityUpdate): Promise<boolean> {
     const opps = await this.getOpportunities();
     const index = opps.findIndex((o) => o.id === id);
-    if (index === -1) return false;
-
     const base = opps[index];
-    const updated = { ...base, ...updates } as Opportunity;
+    if (index === -1 || !base) return false;
+
+    const updated = mergeOpportunity(base, updates);
     const rowNum = index + 2; // +2 for header row and 0-index
 
     await this.sheets.spreadsheets.values.update({
@@ -115,22 +132,7 @@ export class SheetsService {
       range: `Opportunities!A${rowNum}:K${rowNum}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [
-          [
-            updated.id,
-            updated.title,
-            updated.description,
-            updated.skillsRequired.join(", "),
-            updated.commitmentPercent.min,
-            updated.commitmentPercent.max,
-            updated.hourlyRate.min,
-            updated.hourlyRate.max,
-            updated.responsibilities,
-            updated.status,
-            updated.createdBy,
-            updated.createdAt,
-          ],
-        ],
+        values: [opportunityToRow(updated)],
       },
     });
     return true;
