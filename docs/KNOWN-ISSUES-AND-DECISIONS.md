@@ -962,3 +962,28 @@ UX the bot's links lead into.
 **Cleanup (folded into decision D-e):** delete orphaned user `92a9a5cc…`;
 deactivate the still-live, never-used invite `87903afd…` (minted 2026-09-14,
 `usageCount 0/1`) so no stray signup can join the org through it.
+
+### 29. A contributor whose proposal is under review gets silence, not a status answer (OPEN — UX gap, observed 2026-10-07)
+
+Found attempting QA case C4. Aleksa (session phase `review`, own agreement
+`a_1791295559074` under review for E6) sent the bot a free-text message; the bot
+replied with nothing at all.
+
+- **Why:** `message:text` in phase `review` routes to `handleReview`
+  (src/bot.ts:92), whose entire body is an `if/else if` chain over `review:*`
+  callback data. Free text that is not reviewer feedback matches no branch, so
+  the function returns without replying (src/conversations/review.ts:10).
+- **Ruled out first:** full health check passed (Anthropic key 200, Telegram
+  identity, backend, frontend — 2026-10-07T18:36Z), container up since the
+  2026-10-06T12:30Z build, no errors logged. This is by-design routing, not the
+  §17 credit silence or a crash.
+- **User impact:** a candidate asking "any update on my proposal?" during the
+  48-hour review window — the most natural question at exactly that moment —
+  gets dead air. Indistinguishable from a broken bot.
+
+**Disposition:** no code change during this campaign (the fall-through is load-
+bearing: anything the candidate types must not disturb a live review). Post-
+campaign fix is one `else` branch: a short "your proposal is still with the
+reviewers, I'll notify you the moment there's a decision" reply. Does not block
+C4 — the case runs via `/start` → matching phase, which routes free text to
+discovery (profile re-extraction) as designed.
