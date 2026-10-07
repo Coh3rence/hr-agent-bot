@@ -1,0 +1,128 @@
+# QA Run Sheet — final 12 cases (written 2026-10-07)
+
+The execution companion to `QA-COMPLETION-PLAN.md`. Code work is finished — the
+Phase E batch is committed locally at `a930d8b` (165 tests pass) and waits only
+on the deploy window. Everything below is live QA. Tick boxes here as you go;
+mark the Result column in `QA-VERIFICATION.md` after each case.
+
+**Deadline: 2026-10-10.** Critical path: the friend's availability Oct 8–9.
+
+---
+
+## Session 1 — today, Oct 7 (Aleksa solo, ~15 min)
+
+### G6 — Team view renders the hire
+
+1. [ ] Open https://collabberry-frontend.vercel.app, sign in as org admin
+       (wallet signature).
+2. [ ] Open the **Team** view.
+3. [ ] **PASS if:** Gustavo (the 09-09 test candidate) shows as a team member
+       with an agreement at $40/hr equivalent, 50% commitment.
+
+### G7 — marketRate conversion (same screen)
+
+4. [ ] Open Gustavo's agreement detail.
+5. [ ] **PASS if:** Market Rate reads **$6400/month** (= 40 × 160
+       `FTE_HOURS_PER_MONTH`). App-side only — the sheet cannot prove this.
+
+### G8 — consumed invite link refuses reuse
+
+6. [ ] Find the original invite link the bot DM'd in the 09-09 run (token
+       `06ceee59-545e-452e-a836-5669f9115bf4`). Use the real link from Telegram
+       history — do not hand-assemble the URL.
+7. [ ] Open it in a browser.
+8. [ ] **PASS if:** refused cleanly — a clear "already used / invalid" state,
+       not a crash and not a second signup.
+
+### C4 — graceful decline (LAST solo case — it overwrites your contributor profile)
+
+9. [ ] From your own account, message the bot with skills unrelated to any open
+       role, e.g.: *"I'd like to contribute — my skills are veterinary surgery
+       and equine dentistry, $50/hr, 50%, CET."*
+10. [ ] **PASS if:** the bot declines gracefully (no strong matches) rather than
+        forcing a bad match.
+
+### Housekeeping
+
+11. [ ] Mark G6, G7, G8, C4 in `QA-VERIFICATION.md`.
+12. [ ] **Ping the friend** and lock a slot: Oct 8 after ~15:00 UTC, or Oct 9.
+
+---
+
+## Session 2 — Oct 8, 14:06–14:21 UTC (E6 + deploy)
+
+### E6 — 48h escalation (the 32nd case; never run in history)
+
+1. [ ] Do **not** touch `a_1791295559074` before the window. The sweep runs
+       every 15 minutes.
+2. [ ] **PASS if:** the Agreements row flips to `escalated` **and** every admin
+       receives the escalation DM.
+3. [ ] Mark E6 in `QA-VERIFICATION.md`.
+
+### Phase E deploy (Claude drives, immediately after E6)
+
+Deploy restarts the bot — only in a quiet window, never over an active review.
+
+4. [ ] Confirm **no** agreement is `under_review`.
+5. [ ] `railway up --service bot --ci` (uploads the working tree, not a git ref).
+6. [ ] Verify by **build timestamp** — never by `git log`.
+7. [ ] One-time header write: `supersededBy` into `Agreements!R1` on the prod
+       sheet.
+8. [ ] Ledger entry in `QA-REVERT-LEDGER.md` (REVERT vs KEEP split).
+
+Ships: §24 submit guard `465a0a3`, §23 retire-on-commit `6ed1c34`, lineage
+column `df642e3`, reviewer DM revision context `e6dbd54`, §26 parse_mode audit
+`03a1ed7`. Deploying **before** Phase D is deliberate — D-2 exercises the new
+Modify behavior.
+
+---
+
+## Session 3 — Oct 8 (post-deploy) or Oct 9 (Aleksa + friend + one reviewer)
+
+### Phase C — onboard the 4th account (~5 min)
+
+1. [ ] Friend sends `/start` to the bot.
+2. [ ] **A2 PASS if:** access refused and **no opportunity data leaks**.
+3. [ ] All three admins receive the access request with Authorize / Ignore
+       buttons.
+4. [ ] Tap **Authorize as Contributor** — **never Admin**: an admin account
+       joins the reviewer pool and breaks the quorum arithmetic Phase D needs.
+5. [ ] **A3 PASS if:** the friend can now proceed.
+
+### D-1 — F2, E4, E5 on `opp_001` (Smart Contract Developer, $55–85/hr, 30–60%)
+
+If a run spoils, retry on `opp_003` for a fresh round budget.
+
+6. [ ] Friend onboards conversationally, selects `opp_001`, proposes **above
+       budget** (e.g. $95/hr), submits for review.
+7. [ ] One reviewer (Gustavo *or* Simon) **counters lower**; Aleksa **approves**.
+8. [ ] **E4 PASS if:** the review closes at 2 of 3 — not unanimity.
+9. [ ] Friend taps **Accept** on the counter.
+10. [ ] **F2 PASS if:** the final row carries the **counter's** rate, not the
+        $95 ask. *The most commercially important untested case in the campaign.*
+11. [ ] The third reviewer taps afterwards.
+12. [ ] **E5 PASS if:** the outcome is unchanged by the late tap.
+
+### D-2 — D2 round cap + §19 (second round, same pair)
+
+13. [ ] Round 2: reviewers counter again; friend taps **Modify**, revises,
+        resubmits.
+14. [ ] **D2 PASS if:** at the cap the bot refuses a third round, offering only
+        Accept / Walk away. (Unit-tested 2026-10-01; never observed live.)
+15. [ ] **§19 PASS if:** in a round with one approve + one reject, the friend
+        **cannot** accept at their own asking rate — Modify / Walk away only.
+
+### D-3 — F4 walk-away cooldown
+
+16. [ ] Friend taps **Walk away** on a closed review.
+17. [ ] **F4 PASS if:** the friend's Contributors row goes to status `cooldown`
+        for 3 days, and a fresh `/start` is refused with the cooldown message.
+        (No contributor has ever had status `cooldown`.)
+
+---
+
+## Done = 32/32
+
+Afterwards: fill the remaining Result columns in `QA-VERIFICATION.md`, close the
+ledger, and raise decision **D-e** with Gustavo (who cleans up the test
+identities in the live org) — non-blocking but should not be a surprise.
