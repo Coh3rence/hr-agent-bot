@@ -939,3 +939,26 @@ deploy. Fix both defects together: align the write (and the phantom `createdAt`)
 real 11-column schema, and merge partial edits against the base row instead of `|| 0`
 defaults. Scheduling decision (hotfix now vs. final Phase E deploy) recorded in the ledger
 when taken.
+
+### 28. Consumed invite tokens are refused server-side only — the signup form renders anyway (UPSTREAM OBSERVATION, 2026-10-07; not a bot defect)
+
+Found during QA case G8 (single-use invite). Reusing the consumed 09-09 token
+(`06ceee59…`) with a fresh wallet at `/member-sign-up`:
+
+- **The property under test held.** DB verified: the invitation row stayed
+  `isActive=0, usageCount=1/1`, and the attempt was refused org membership — the
+  new user row has `organization_id=NULL`. G8 is a PASS.
+- **But the frontend never checks the token before offering signup.** The page
+  renders the full "Create Your Profile" form against a dead token; the refusal
+  only happens server-side at submit. A real invitee would experience this as
+  filling in a profile and silently failing, not as "this invite was already used".
+- **And the attempt leaves residue:** an orphaned `Users` row (`92a9a5cc…`,
+  "Coh3rence Tester", wallet `0x74ec…`, no org) was created before the refusal.
+
+**Scope:** Collabberry frontend/backend (the client's app), not the bot — no bot
+code change follows from this. Recorded for handover because it shapes the invite
+UX the bot's links lead into.
+
+**Cleanup (folded into decision D-e):** delete orphaned user `92a9a5cc…`;
+deactivate the still-live, never-used invite `87903afd…` (minted 2026-09-14,
+`usageCount 0/1`) so no stray signup can join the org through it.

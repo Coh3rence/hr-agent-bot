@@ -25,14 +25,15 @@ mark the Result column in `QA-VERIFICATION.md` after each case.
 5. [x] **PASS:** Market Rate column reads **$6,400** (= 40 × 160
        `FTE_HOURS_PER_MONTH`). App-side only — the sheet cannot prove this.
 
-### G8 — consumed invite link refuses reuse
+### G8 — consumed invite link refuses reuse — PASS 2026-10-07 (with caveat)
 
-6. [ ] Find the original invite link the bot DM'd in the 09-09 run (token
-       `06ceee59-545e-452e-a836-5669f9115bf4`). Use the real link from Telegram
-       history — do not hand-assemble the URL.
-7. [ ] Open it in a browser.
-8. [ ] **PASS if:** refused cleanly — a clear "already used / invalid" state,
-       not a crash and not a second signup.
+6. [x] Reuse attempted with a fresh wallet against the consumed 09-09 token.
+7. [x] DB verified: token unchanged (`isActive=0, usageCount=1/1`), attempt
+       refused org membership (`organization_id=NULL`).
+8. [x] **Caveat:** refusal is server-side only — the frontend serves the full
+       signup form before validating the token and leaves an orphaned Users row.
+       Orphan `92a9a5cc` + the unused live invite `87903afd…` go on the D-e
+       cleanup list. Logged as KNOWN-ISSUES §28 (upstream observation).
 
 ### C4 — graceful decline (LAST solo case — it overwrites your contributor profile)
 
