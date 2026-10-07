@@ -132,8 +132,8 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 | G3 | Confirmation tap | Return to Telegram, tap "I've signed up" | Bot links the wallet and creates the on-chain agreement | PASS | `walletAddress = 0x290a26a086d4ee4437c80aa1d669576cb7512061`, on-chain agreement created (Arbitrum One) |
 | G4 | Sheet updated | Check Contributors row | status `hired`, walletAddress and collabberryUserId populated | PASS | `c_1788807562702` status `hired`, wallet and userId both populated |
 | G5 | Agreement recorded | Check Agreements row | `betaAppAgreementId` populated | PASS | `betaAppAgreementId = 231b0916-c607-4fba-9a24-68d593dcfc3c` |
-| G6 | Renders in app | Open frontend Team view as org admin | Contributor and agreement visible with correct rate and commitment | Not yet run | Scheduled — browser inspection of the Team view ($40/hr, 50%) |
-| G7 | Rate conversion | Compare hourly ask to agreement marketRate | marketRate = hourly × 160 | Not yet run | Scheduled with G6 — expect `marketRate = 6400` (40 × 160); app-side only, not visible in the sheet |
+| G6 | Renders in app | Open frontend Team view as org admin | Contributor and agreement visible with correct rate and commitment | PASS | 2026-10-07, browser inspection as admin `0xd02f…5878`: Gustavo (Collabberry display name "Guena Cosa") renders as Community Manager, 50% commitment, agreement view/edit icons present. Two prior test identities also visible (July E2E "Aleksa" Frontend Developer $8,000; admin row without agreement) — cleanup is decision D-e |
+| G7 | Rate conversion | Compare hourly ask to agreement marketRate | marketRate = hourly × 160 | PASS | 2026-10-07, same view: Market Rate column reads **$6,400** = $40/hr × 160 (`FTE_HOURS_PER_MONTH`); monetary comp $0 (all TeamPoints, `fiatRequested = 0` default) |
 | G8 | Single-use invite | Attempt to reuse a consumed invite token | Second redemption refused cleanly | Not yet run | Scheduled — re-open the consumed G1 link (reuse the original message, don't hand-assemble the URL) |
 
 ## 5. Known limitations — disclose before testing

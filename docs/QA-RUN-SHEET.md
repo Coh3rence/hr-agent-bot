@@ -11,18 +11,18 @@ mark the Result column in `QA-VERIFICATION.md` after each case.
 
 ## Session 1 — today, Oct 7 (Aleksa solo, ~15 min)
 
-### G6 — Team view renders the hire
+### G6 — Team view renders the hire — PASS 2026-10-07
 
-1. [ ] Open https://collabberry-frontend.vercel.app, sign in as org admin
+1. [x] Open https://collabberry-frontend.vercel.app, sign in as org admin
        (wallet signature).
-2. [ ] Open the **Team** view.
-3. [ ] **PASS if:** Gustavo (the 09-09 test candidate) shows as a team member
-       with an agreement at $40/hr equivalent, 50% commitment.
+2. [x] Open the **Team** view.
+3. [x] **PASS:** Gustavo (display name "Guena Cosa") shows as Community Manager,
+       50% commitment, agreement icons present.
 
-### G7 — marketRate conversion (same screen)
+### G7 — marketRate conversion (same screen) — PASS 2026-10-07
 
-4. [ ] Open Gustavo's agreement detail.
-5. [ ] **PASS if:** Market Rate reads **$6400/month** (= 40 × 160
+4. [x] Open Gustavo's agreement detail.
+5. [x] **PASS:** Market Rate column reads **$6,400** (= 40 × 160
        `FTE_HOURS_PER_MONTH`). App-side only — the sheet cannot prove this.
 
 ### G8 — consumed invite link refuses reuse
