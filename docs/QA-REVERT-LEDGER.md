@@ -231,6 +231,23 @@ things beyond the agreement row:
   `2026-10-08T10:28:57.784Z` back). Classified **KEEP** — the repair *is* the revert of an
   accidental mutation; undoing it would re-orphan the agreements.
 
+### K10. Phase E batch deployed 2026-10-08 (final campaign deploy) — KEEP
+- Working tree at `d02bc1e`, then `railway up --service bot --ci`.
+- Build **`2026-10-08T14:23:22Z`** (previous: `2026-10-06T12:30:21Z`), status SUCCESS.
+  Boot log clean at 14:24:09Z — Sheets connected, sweep scheduled, sessions volume mounted.
+- **Deployed with nothing in review** — state dump immediately before showed zero
+  `under_review` rows (the E6 agreement had just escalated at 14:15:52Z; deploy began
+  minutes later, inside the planned post-E6 quiet window).
+- What shipped: §24 submit guard `465a0a3`, §23 retire-on-commit `6ed1c34`, lineage column
+  `df642e3`, reviewer DM revision context `e6dbd54`, §26 parse_mode audit `03a1ed7`,
+  §31 match-score floor `ea5da9c` (added same-day after C4 failed). 169 tests, typecheck
+  clean at deploy time.
+- **Sheet change (one-time, idempotent):** `Agreements!R1` = `supersededBy` via
+  `_write_header_tmp.ts` (checks-before-writing; second run is a no-op). Undo = clear R1 —
+  but **KEEP**: the deployed code writes column R on supersede.
+- **Undo (code):** redeploy the previous image `sha256:dae1cd14…` (or `git revert` the six
+  commits + `railway up`). Nothing else to clean on the data side.
+
 ---
 
 ## Authorized users — unchanged
