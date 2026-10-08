@@ -1021,3 +1021,33 @@ id** (`c_1790157082079` → `c_1791455337784`) and a new `createdAt`.
 tested; this fix deserves its own tests, and no remaining QA case re-onboards an
 existing contributor — the friend is a brand-new row). Goes to the post-campaign
 fix list alongside §29.
+
+### 31. No match-score floor — the graceful decline is unreachable, 11% matches are offered for negotiation (OPEN — C4 FAIL, 2026-10-08)
+
+QA case C4: a profile of "veterinary surgery, equine dentistry" was shown all
+three open roles as tappable options — Community Manager 15%, Frontend Developer
+12%, Smart Contract Developer 11%, each badged 🔴 — ending with "Select an
+opportunity to start negotiating terms:".
+
+- **Mechanism:** `matchOpportunities` (claude.ts) returns every opportunity the
+  model scores; nothing filters on `overallScore`. The callers (gate.ts:92,
+  discovery's matching block) decline only when the list is *empty* — which never
+  happens, because the tool schema asks the model to score each opportunity, not
+  to omit poor fits. So "No strong matches found right now. We'll keep your
+  profile on file." is dead code on every realistic input.
+- **Why it matters:** C4's premise — the bot should not steer an unsuitable
+  candidate into negotiation — is the guard against wasting three reviewers'
+  time on a proposal that can only be rejected (and the candidate then eats a
+  3-day cooldown for applying to a role the bot itself scored at 11%).
+- **The threshold already exists in presentation:** the badge logic calls <50 🔴
+  ("bad") and ≥75 🟢 — the system *knows* these are poor matches and offers them
+  anyway.
+- **Fix sketch (small):** filter `score >= 50` (reuse the badge boundary) at the
+  end of `matchOpportunities`, making the existing empty-list decline branch
+  reachable. One unit test: all-low scores → empty result. Optionally tell the
+  model it may return fewer matches than opportunities.
+
+**Disposition:** recorded as the honest C4 result (FAIL). Fix decision pending:
+either a surgical commit riding today's post-E6 Phase E deploy (C4 re-run is
+cheap — the veterinary profile is still in place, one `/start` re-tests it), or
+hand over as a known issue with §29/§30. Decision recorded here when taken.

@@ -89,7 +89,7 @@ Confirms the admin never edits the spreadsheet directly — all changes go throu
 | C1 | Natural-language intake | Describe skills conversationally, not as a form | Bot extracts skills, rate range, availability, timezone without rigid prompts | PASS | Skills extracted conversationally into both Contributors rows (2026-09-07, 2026-09-23) |
 | C2 | Structured capture | Check the Contributors sheet row | Skills, commitment %, rate min/max, timezone, location all populated correctly | PASS | Both rows fully populated — skills, commitment %, rate min/max, timezone, location |
 | C3 | Role match | Continue to matching | Bot proposes a relevant role with a match score | PASS | `settlementLikelihood` populated on every agreement row |
-| C4 | Poor-fit handling | Offer skills unrelated to any open role | Bot declines gracefully rather than forcing a bad match | Not yet run | Scheduled — admin solo session (deliberately unmatchable skills) |
+| C4 | Poor-fit handling | Offer skills unrelated to any open role | Bot declines gracefully rather than forcing a bad match | FAIL | 2026-10-08: veterinary-surgery profile was offered all three open roles as selectable matches at 11–15% score ("Select an opportunity to start negotiating terms"). No match-score floor exists, so the decline branch is unreachable (§31). Run also exposed §30 (identity regeneration on re-onboarding; repaired, ledger K9) |
 
 ### D — Negotiation
 
