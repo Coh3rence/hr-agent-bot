@@ -213,6 +213,24 @@ things beyond the agreement row:
   §23/§24/lineage/reviewer-DM wait for the final Phase E batch so the behavior Phase D
   exercises is not changed mid-campaign.
 
+### K9. Contributor id restored on the prod sheet 2026-10-08 (data repair, no deploy) — KEEP
+- **What changed:** `Contributors!A3` `c_1791455337784` → `c_1790157082079`;
+  `Contributors!N3` (createdAt) `2026-10-08T10:28:57.784Z` → `2026-09-23T09:51:22.079Z`.
+  Veterinary profile fields (C4's subject) deliberately left in place.
+- **Why:** running C4 re-onboarded an existing contributor, which hit §30 — discovery
+  passes a *complete* contributor object (fresh `c_${Date.now()}` id, fresh createdAt) to
+  `updateContributor`, so the sheet row's identity was regenerated. That orphaned all three
+  of Aleksa's Agreements rows, including `a_1791295559074` — and the timeout sweep
+  **silently skips** agreements whose contributor can't be resolved (timeout.ts:91-94), so
+  E6 would never have fired at today's 14:06Z window.
+- **How:** one-shot script `_restore_contributor_id_tmp.ts` under `NODE_ENV=production`
+  (2026-10-08 ~10:45Z), verified by state dump immediately after. Session file on the
+  volume already carried the old id (discovery patches it back in memory post-write), so
+  the repair re-aligns sheet, session and agreements.
+- **Undo:** swap the two constants in the script and re-run (writes `c_1791455337784` /
+  `2026-10-08T10:28:57.784Z` back). Classified **KEEP** — the repair *is* the revert of an
+  accidental mutation; undoing it would re-orphan the agreements.
+
 ---
 
 ## Authorized users — unchanged

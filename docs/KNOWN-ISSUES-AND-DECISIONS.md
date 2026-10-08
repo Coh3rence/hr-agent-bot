@@ -987,3 +987,37 @@ campaign fix is one `else` branch: a short "your proposal is still with the
 reviewers, I'll notify you the moment there's a decision" reply. Does not block
 C4 — the case runs via `/start` → matching phase, which routes free text to
 discovery (profile re-extraction) as designed.
+
+### 30. Re-onboarding an existing contributor regenerates their identity on the sheet, orphaning their agreements (OPEN — found live by C4, 2026-10-08)
+
+Found running QA case C4. Aleksa (an existing contributor) went through discovery
+again; the bot replied correctly, but the Contributors row came out with a **new
+id** (`c_1790157082079` → `c_1791455337784`) and a new `createdAt`.
+
+- **Mechanism:** `discovery.ts:81` builds a *complete* `Contributor` object —
+  including `id: c_${Date.now()}`, fresh `createdAt`, and `null` wallet/Collabberry
+  fields — and passes the whole thing as the `updates` to
+  `updateContributor(existing.id, contributor)` (discovery.ts:105). The sheet-side
+  spread `{...current, ...updates}` therefore replaces **every** column, identity
+  included. The code patches `contributor.id = existing.id` back *in memory* one
+  line later (discovery.ts:106) — after the write — so session state and the sheet
+  disagree.
+- **Blast radius:** every Agreements row referencing the old id dangles. The 48h
+  timeout sweep resolves the contributor and **silently skips** on failure
+  (timeout.ts:91-94) — so a dangling agreement never escalates and never
+  aggregates. For a *hired* contributor the overwrite would also null
+  `walletAddress`/`collabberryUserId`/`collabberryInviteToken`, severing the
+  Collabberry linkage. Gustavo's row was one re-onboarding away from exactly that.
+- **Live impact 2026-10-08:** `a_1791295559074` (E6, the never-run 32nd case) was
+  orphaned ~3.5h before its escalation window. Repaired by restoring the original
+  id on the sheet — ledger **K9**. E6 unblocked.
+- **Fix sketch (one commit):** pass only profile fields in the update — skills,
+  rate, commitment, timezone, location, name, handle — never `id`, `createdAt`,
+  `previousAttempts`, `status`, or the wallet/Collabberry columns. The existing
+  §27 deep-merge precedent applies. Unit test: re-onboarding preserves identity
+  and linkage columns.
+
+**Disposition:** not shipped in today's Phase E deploy (batch is frozen and
+tested; this fix deserves its own tests, and no remaining QA case re-onboards an
+existing contributor — the friend is a brand-new row). Goes to the post-campaign
+fix list alongside §29.
