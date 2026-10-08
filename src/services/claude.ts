@@ -11,6 +11,15 @@ import type {
   CounterOffer,
 } from "../models/types";
 
+// §31: the model scores every opportunity rather than omitting poor fits, so an
+// unfiltered list is never empty and the callers' "no strong matches" decline
+// could never fire. 50 is the boundary the match-list badge already paints red.
+export const MIN_MATCH_SCORE = 50;
+
+export function presentableMatches<T extends { score: number }>(matches: T[]): T[] {
+  return matches.filter((m) => m.score >= MIN_MATCH_SCORE);
+}
+
 export class ClaudeService {
   private client: Anthropic;
   private model: string;
@@ -160,7 +169,7 @@ Return matches sorted by overallScore descending.`;
 
     if (!result?.matches) return [];
 
-    return result.matches
+    const scored = result.matches
       .map((m) => {
         const opp = opportunities.find((o) => o.id === m.opportunityId);
         if (!opp) return null;
@@ -179,6 +188,8 @@ Return matches sorted by overallScore descending.`;
       })
       .filter((m): m is NonNullable<typeof m> => m !== null)
       .sort((a, b) => b.score - a.score);
+
+    return presentableMatches(scored);
   }
 
   async aggregateFeedback(
