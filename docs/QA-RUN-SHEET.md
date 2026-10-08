@@ -35,17 +35,20 @@ mark the Result column in `QA-VERIFICATION.md` after each case.
        Orphan `92a9a5cc` + the unused live invite `87903afd…` go on the D-e
        cleanup list. Logged as KNOWN-ISSUES §28 (upstream observation).
 
-### C4 — graceful decline (LAST solo case — it overwrites your contributor profile)
+### C4 — graceful decline (LAST solo case) — FAIL 2026-10-08 (§31)
 
-9. [ ] From your own account, message the bot with skills unrelated to any open
-       role, e.g.: *"I'd like to contribute — my skills are veterinary surgery
-       and equine dentistry, $50/hr, 50%, CET."*
-10. [ ] **PASS if:** the bot declines gracefully (no strong matches) rather than
-        forcing a bad match.
+9. [x] Ran 2026-10-08. Two detours, both documented: free text in `review` phase
+       is swallowed by design (§29 — needed `/start` → matching first), and the
+       re-onboarding regenerated the contributor id, orphaning the E6 agreement
+       (§30 — sheet repaired, ledger K9).
+10. [x] **FAIL:** all three open roles were offered as tappable matches at 11–15%
+        score. No match-score floor exists; the decline branch is unreachable
+        (§31). Fix decision pending — a surgical filter could ride the Phase E
+        deploy and C4 re-runs with one `/start`.
 
 ### Housekeeping
 
-11. [ ] Mark G6, G7, G8, C4 in `QA-VERIFICATION.md`.
+11. [x] G6, G7, G8, C4 marked in `QA-VERIFICATION.md`.
 12. [ ] **Ping the friend** and lock a slot: Oct 8 after ~15:00 UTC, or Oct 9.
 
 ---
