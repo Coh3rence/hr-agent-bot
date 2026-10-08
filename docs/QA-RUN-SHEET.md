@@ -55,13 +55,14 @@ mark the Result column in `QA-VERIFICATION.md` after each case.
 
 ## Session 2 — Oct 8, 14:06–14:21 UTC (E6 + deploy)
 
-### E6 — 48h escalation (the 32nd case; never run in history)
+### E6 — 48h escalation (the 32nd case; never run in history) — PASS 2026-10-08
 
-1. [ ] Do **not** touch `a_1791295559074` before the window. The sweep runs
-       every 15 minutes.
-2. [ ] **PASS if:** the Agreements row flips to `escalated` **and** every admin
-       receives the escalation DM.
-3. [ ] Mark E6 in `QA-VERIFICATION.md`.
+1. [x] Untouched before the window (§30 orphaning repaired in time, ledger K9).
+2. [x] **PASS:** escalated at 14:15:52Z (log: `no quorum: 0/2`), sheet row
+       `escalated`, no counter-offer. Candidate correctly excluded from the DM
+       pool; both reviewer DMs dispatched without errors. Gustavo/Simon asked to
+       confirm receipt (non-blocking).
+3. [x] Marked in `QA-VERIFICATION.md`.
 
 ### Phase E deploy (Claude drives, immediately after E6)
 
