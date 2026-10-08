@@ -81,9 +81,10 @@ column `df642e3`, reviewer DM revision context `e6dbd54`, §26 parse_mode audit
 Deploying **before** Phase D is deliberate — D-2 exercises the new Modify
 behavior.
 
-9. [ ] Post-deploy: re-run C4 with one `/start` (veterinary profile still in
-       place). **PASS if** the bot now declines gracefully — record the re-run
-       outcome in `QA-VERIFICATION.md` next to the original FAIL.
+9. [x] Post-deploy C4 re-run — **PASS** 2026-10-08: "No strong matches found
+       right now. We'll keep your profile on file.", no buttons. First time the
+       decline branch has ever fired in production. Recorded in
+       `QA-VERIFICATION.md` next to the original FAIL.
 
 ---
 
