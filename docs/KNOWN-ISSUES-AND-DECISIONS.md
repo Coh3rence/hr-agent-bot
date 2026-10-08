@@ -1022,7 +1022,7 @@ tested; this fix deserves its own tests, and no remaining QA case re-onboards an
 existing contributor — the friend is a brand-new row). Goes to the post-campaign
 fix list alongside §29.
 
-### 31. No match-score floor — the graceful decline is unreachable, 11% matches are offered for negotiation (OPEN — C4 FAIL, 2026-10-08)
+### 31. No match-score floor — the graceful decline is unreachable, 11% matches are offered for negotiation (C4 FAIL; FIXED IN CODE 2026-10-08, awaiting Phase E deploy)
 
 QA case C4: a profile of "veterinary surgery, equine dentistry" was shown all
 three open roles as tappable options — Community Manager 15%, Frontend Developer
@@ -1047,7 +1047,10 @@ opportunity to start negotiating terms:".
   reachable. One unit test: all-low scores → empty result. Optionally tell the
   model it may return fewer matches than opportunities.
 
-**Disposition:** recorded as the honest C4 result (FAIL). Fix decision pending:
-either a surgical commit riding today's post-E6 Phase E deploy (C4 re-run is
-cheap — the veterinary profile is still in place, one `/start` re-tests it), or
-hand over as a known issue with §29/§30. Decision recorded here when taken.
+**Disposition:** recorded as the honest C4 result (FAIL). Decision (Aleksa,
+2026-10-08): fix now. Commit `ea5da9c` — `presentableMatches` filters below
+`MIN_MATCH_SCORE = 50` (the red-badge boundary) at the tail of
+`matchOpportunities`, making both callers' existing decline branches reachable;
+4 unit tests (169 pass). Rides the post-E6 Phase E deploy; C4 re-runs with one
+`/start` afterwards (the veterinary profile is still in place), and the
+verification record gets the re-run outcome alongside the original FAIL.

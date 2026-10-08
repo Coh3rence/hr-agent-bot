@@ -76,8 +76,13 @@ Deploy restarts the bot — only in a quiet window, never over an active review.
 
 Ships: §24 submit guard `465a0a3`, §23 retire-on-commit `6ed1c34`, lineage
 column `df642e3`, reviewer DM revision context `e6dbd54`, §26 parse_mode audit
-`03a1ed7`. Deploying **before** Phase D is deliberate — D-2 exercises the new
-Modify behavior.
+`03a1ed7`, §31 match-score floor `ea5da9c` (added 2026-10-08 after C4 failed).
+Deploying **before** Phase D is deliberate — D-2 exercises the new Modify
+behavior.
+
+9. [ ] Post-deploy: re-run C4 with one `/start` (veterinary profile still in
+       place). **PASS if** the bot now declines gracefully — record the re-run
+       outcome in `QA-VERIFICATION.md` next to the original FAIL.
 
 ---
 
