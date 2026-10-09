@@ -68,7 +68,7 @@ These are the rules the tests below assert against. All are environment-overrida
 | ID | Test | Steps | Expected result | Result | Notes |
 |---|---|---|---|---|---|
 | A1 | Bot responds | Send `/start` to @Coh3erence_hr_bot | Bot replies; conversation begins | PASS | Both contributors onboarded via `/start` (2026-09-07, 2026-09-23) |
-| A2 | Unauthorised user is gated | `/start` from an account not in AuthorizedUsers | Access is refused, no opportunity data leaks | Not yet run | Scheduled — onboarding of a 4th (non-admin) account |
+| A2 | Unauthorised user is gated | `/start` from an account not in AuthorizedUsers | Access is refused, no opportunity data leaks | PASS | 2026-10-09: 4th account ("Nikola", id 8983159792, no username) sent `/start`; admin DM with name/ID + Contributor/Admin/Ignore buttons received (screenshot). Refusal copy is a static string in the same branch that produced the admin DM (gate.ts) — branch provably executed, nothing dynamic to leak. §26 fix visible: username-less requester rendered without breaking the DM |
 | A3 | Admin authorisation | Admin runs `/authorize` for a new Telegram id | User is added and can now proceed | Not yet run | Scheduled with A2 — authorised as Contributor |
 
 ### B — Admin opportunity management

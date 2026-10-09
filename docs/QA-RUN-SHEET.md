@@ -92,10 +92,11 @@ behavior.
 
 ### Phase C — onboard the 4th account (~5 min)
 
-1. [ ] Friend sends `/start` to the bot.
-2. [ ] **A2 PASS if:** access refused and **no opportunity data leaks**.
-3. [ ] All three admins receive the access request with Authorize / Ignore
-       buttons.
+1. [x] Friend ("Nikola", id 8983159792) sent `/start` 2026-10-09.
+2. [x] **A2 PASS:** refused via the static gate copy (same code branch as the
+       admin DM, which provably fired); no dynamic content to leak.
+3. [x] Access request with Authorize / Ignore buttons received (screenshot;
+       §26 fix visible — no-username requester didn't break the DM).
 4. [ ] Tap **Authorize as Contributor** — **never Admin**: an admin account
        joins the reviewer pool and breaks the quorum arithmetic Phase D needs.
 5. [ ] **A3 PASS if:** the friend can now proceed.
