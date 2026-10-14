@@ -131,6 +131,27 @@ things beyond the agreement row:
   written through `railway run`. Reading the dev sheet by mistake shows an almost-empty
   database and invites the conclusion that production has been wiped.
 
+### R6. The QA tester holds an `admin` row — **OPEN, 2026-10-14**
+
+- **Set to:** `AuthorizedUsers` row 5 = `8983159792, admin` (Nikola, the QA tester).
+- **Was:** `8983159792, contributor`, present **three times** (DEF-5 — repeated
+  taps of the inline Authorize button appended a row each time). The two
+  duplicates were deleted in the same operation, so DEF-5 is closed for this id.
+- **Why:** the closeout needs a reviewer who only ever taps **Approve** — Counter
+  requires typing a rate and Reject a reason, so an approve-only reviewer is the
+  one genuinely button-only seat. With Aleksa as the candidate the pool becomes
+  Gustavo + Simon + Nikola = 3, quorum 2, the same arithmetic that passed E4.
+- **Why it must be reverted:** `admin` is not only the reviewer pool, it is also
+  the admin-command gate (`isAdmin` → `/add_opportunity`, `/edit_opportunity`,
+  `/pause_opportunity`). An outside tester must not keep write access to the
+  client's live opportunity rows after the campaign.
+- **Revert:** set row 5 column B back to `contributor` (one row, not three), or
+  delete the row outright if the tester should lose access entirely.
+- **Trap worth knowing:** `reviewRecipients` (quorum.ts:132) does **not** dedupe
+  and `respondedWithinPool` counts by filtering the pool list, so a *duplicate*
+  admin row would inflate the pool and double-count that reviewer's response.
+  Promote by editing one row — never by tapping "Authorize as Admin" again.
+
 ---
 
 ## KEEP — intended changes, do not undo
@@ -250,9 +271,12 @@ things beyond the agreement row:
 
 ---
 
-## Authorized users — unchanged
+## Authorized users — one added row, tracked as R6
 
-`AuthorizedUsers` still holds exactly the three real rows it held before this
-work: `535329585` (Aleksa), `302836662` (Gustavo, the client), `1971913512`
-(Simon). Temporarily swapping the client out of the review pool was considered
-and **not done** — the harness made it unnecessary.
+The three real rows are untouched: `535329585` (Aleksa), `302836662` (Gustavo,
+the client), `1971913512` (Simon). Temporarily swapping the client out of the
+review pool was considered and **not done** — the harness made it unnecessary.
+
+Added since: `8983159792` (Nikola, QA tester) — authorised as `contributor`
+2026-10-09 for A2/A3, promoted to `admin` 2026-10-14 so he can serve as the
+approve-only reviewer. Both steps are one row, and the undo is **R6**.

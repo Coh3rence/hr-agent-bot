@@ -97,9 +97,17 @@ behavior.
        admin DM, which provably fired); no dynamic content to leak.
 3. [x] Access request with Authorize / Ignore buttons received (screenshot;
        §26 fix visible — no-username requester didn't break the DM).
-4. [ ] Tap **Authorize as Contributor** — **never Admin**: an admin account
+4. [x] Tap **Authorize as Contributor** — **never Admin**: an admin account
        joins the reviewer pool and breaks the quorum arithmetic Phase D needs.
-5. [ ] **A3 PASS if:** the friend can now proceed.
+       Done 2026-10-09, sheet-verified (`8983159792`, role `contributor`).
+       DEF-5 note: the row landed **3×** (multiple admins/taps) — duplicates are
+       harmless to quorum math (`getAdminIds` filters `role=admin`) but queued
+       for dedupe.
+5. [x] **A3 PASS** 2026-10-11: `/start` cleared the gate, discovery extracted the
+       profile (contributor `c_1791746130193`), session phase `matching` with the
+       match list delivered. Note: he pasted the full instruction message
+       (including the "pick Smart Contract Developer…" directions) as his answer —
+       extraction parsed the profile fields cleanly regardless.
 
 ### D-1 — F2, E4, E5 on `opp_001` (Smart Contract Developer, $55–85/hr, 30–60%)
 
