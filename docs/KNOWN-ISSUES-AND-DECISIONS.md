@@ -1054,3 +1054,50 @@ opportunity to start negotiating terms:".
 4 unit tests (169 pass). Rides the post-E6 Phase E deploy; C4 re-runs with one
 `/start` afterwards (the veterinary profile is still in place), and the
 verification record gets the re-run outcome alongside the original FAIL.
+
+### 32. The counter-offer DM attributes the reviewer's number to the candidate — "your requested rate of $75" when they asked $95 (OPEN — found live during F2/E4, 2026-10-13)
+
+Agreement `a_1791888028961` (Nikola, `opp_001`, asked $95/hr at 50%). Gustavo
+countered `75` — "good profile, but above our budget for this role." — and Aleksa
+approved; quorum closed at 2 of 3 and `aggregatedRate` was written as **75**
+(correct). The prose sent to the candidate at `2026-10-13T17:05:00.944Z` reads:
+
+> …your requested rate of **$75 per hour** is above our budget for this
+> particular role…
+
+- **Mechanism:** the synthesis call (`claude.ts:272-275`) is handed `feedbackText`
+  and nothing else, where each stance renders as `Reviewer (countered at $75/hr):
+  …`. The candidate's own ask never enters the prompt — `originalRate` is a
+  parameter of `aggregateFeedback` but is used only by the all-approve fast-path
+  (`claude.ts:211`) and the numeric guard's `supportedAmounts`
+  (`claude.ts:277-281`). With no anchor for whose number is whose, the model
+  folds the reviewer's counter into the candidate's voice.
+- **Why the guard passes it:** `findSummaryViolation` rejects only figures absent
+  from the feedback. $75 *is* supported, so a right-number/wrong-attribution
+  sentence is clean by construction. §20 restated — the validator judges digits,
+  not claims.
+- **Self-contradicting too:** $75 sits inside `opp_001`'s $55–85 budget, so the
+  sentence tells the candidate that the team's own offer exceeds the team's
+  budget.
+- **Blast radius:** the mixed path only (approve+counter, counter+counter).
+  All-approve, all-reject and the single-reviewer pass-through are deterministic
+  strings. No data impact: `aggregatedRate` comes from `meanOfCounters` and is
+  never parsed back out of the prose.
+- **Fix sketch (small):** prepend the ask to the synthesis payload ("The
+  contributor proposed $95/hr at 50% commitment.") and state in the system prompt
+  that rates carried in the feedback are the *team's* counter, to be presented as
+  the offer. Unit-testable in the shape of the existing §20 validator tests.
+
+**Disposition:** did **not** block F2 — Accept reconciles from `aggregatedRate`,
+not the prose, and F2 passed with the rate moving 95 → 75.
+
+**FIXED IN CODE 2026-10-14, awaiting deploy.** Reproduced first, against the live
+inputs of `a_1791888028961` (`_agg32_tmp.ts`): **5/5 runs** misattributed the $75
+("your rate of $75", "your proposed rate of $75") and **0/5** mentioned the real
+$95 ask — structural, not model variance. Fix passes the ask into the synthesis
+payload (`The contributor asked for $95/hr, 50% commitment.`) and instructs that
+reviewer figures are the team's counter, never the contributor's request. Re-run:
+**0/5** misattributed; sample output reads "our team is proposing a rate of $75
+per hour at the 50% commitment level you requested". 169 unit tests still pass.
+Not yet live — `git push` does not deploy this project; it needs `railway up
+--service bot --ci`, and the deploy should be timed so it does not land mid-review.

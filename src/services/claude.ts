@@ -269,9 +269,21 @@ Return matches sorted by overallScore descending.`;
       })
       .join("\n");
 
+    // §32: without the contributor's own ask in the prompt the model had a single
+    // rate to work with — the reviewers' — and wrote it back as the contributor's
+    // request ("your requested rate of $75" against a $95 ask, 5/5 reproductions).
+    const askTerms: string[] = [];
+    if (typeof originalRate === "number") askTerms.push(`$${originalRate}/hr`);
+    if (typeof originalCommitment === "number") {
+      askTerms.push(`${originalCommitment}% commitment`);
+    }
+    const askLine = askTerms.length
+      ? `The contributor asked for ${askTerms.join(", ")}.\n\n`
+      : "";
+
     const summary = await this.chat(
-      `You are an HR assistant synthesizing multiple reviewer opinions into a single concise counter-offer message for a contributor. Reflect the range of stances honestly, stay professional and constructive, and do not reveal individual reviewer identities. Never state a rate or any other figure that does not appear in the feedback above. Never emit a placeholder in square or curly brackets. This is a continuing negotiation and the contributor will be invited to revise their terms, so do not close the door or suggest they reapply in future. Respond in one paragraph.`,
-      [{ role: "user", content: `Synthesize:\n\n${feedbackText}` }]
+      `You are an HR assistant synthesizing multiple reviewer opinions into a single concise counter-offer message for a contributor. Reflect the range of stances honestly, stay professional and constructive, and do not reveal individual reviewer identities. Any rate or commitment carried by the reviewers is the team's counter-offer — present it as what the team is offering, and never describe it as what the contributor asked for. Never state a rate or any other figure that does not appear in the material above. Never emit a placeholder in square or curly brackets. This is a continuing negotiation and the contributor will be invited to revise their terms, so do not close the door or suggest they reapply in future. Respond in one paragraph.`,
+      [{ role: "user", content: `Synthesize:\n\n${askLine}${feedbackText}` }]
     );
 
     const supportedAmounts = [
