@@ -172,6 +172,31 @@ things beyond the agreement row:
   spreadsheet but the production one, and asserts the row's contributor,
   opportunity, round and `draft` status before writing.
 
+### R8. The C4 no-match profile replaced on the QA candidate's row — **OPEN, 2026-10-14**
+
+- **Set to:** `Contributors!E3` (`c_1790157082079`, Aleksa) = `React, TypeScript,
+  TailwindCSS, Web3, community management, DAO governance, content writing`.
+- **Was:** `veterinary surgery, equine dentistry` — the deliberate poor-fit profile
+  written for C4.
+- **Why:** C4 has passed twice over (FAIL pre-floor, PASS post-floor), so the
+  profile has done its job. With §31 live it now *blocks* the remaining tests: the
+  vet profile scores every open role below 50, so the candidate gets the graceful
+  decline and can never reach negotiation. Cycle 1 (D2 + Modify) needs `opp_002`
+  and Cycle 2 (§19 + F4) needs `opp_003`.
+- **Chosen by probe, not by guesswork** (`_matchprobe.ts`, live Sonnet + the real
+  open opportunities): vet → nothing above the floor; frontend-only → `opp_002` 95
+  but `opp_003` below; the combined profile → `opp_002` **95**, `opp_003` **88**,
+  with `opp_001` still below the floor. One write covers both cycles and leaves no
+  wrong button to tap.
+- **Only column E changed.** `id`, `telegramId`, rate (50–50), commitment (50%) and
+  status (`active`) are untouched — verified after the write.
+- **Deliberately not done through the bot:** re-onboarding would have regenerated
+  the contributor id (§30, still OPEN) and orphaned `a_1790186286202`, the reviewed
+  round 1 that the D2 round-cap test counts.
+- **Revert:** set `Contributors!E3` back to `veterinary surgery, equine dentistry`
+  if C4 ever needs re-running; otherwise this is only QA test data on a QA row and
+  can be left or the row retired with R2.
+
 ---
 
 ## KEEP — intended changes, do not undo
