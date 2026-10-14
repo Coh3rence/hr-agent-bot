@@ -152,6 +152,26 @@ things beyond the agreement row:
   admin row would inflate the pool and double-count that reviewer's response.
   Promote by editing one row — never by tapping "Authorize as Admin" again.
 
+### R7. Stale round-2 draft retired on the Aleksa + `opp_002` pair — **CLOSED 2026-10-14, resolution: KEEP**
+
+- **Set to:** `Agreements!J7` (`a_1790584489474`) `draft` → `superseded`, via
+  `_supersede_tmp.ts` run with `NODE_ENV=production`. `supersededBy` (column R)
+  deliberately left empty — the successor did not exist yet.
+- **Was:** `draft`, round 2, $60/hr at 60% for 3 months, never submitted for review.
+- **Why:** Cycle 1 re-proposes round 2 on this pair, and a dead draft left in
+  `draft` is indistinguishable from a live one to anyone reading the sheet.
+- **Resolution KEEP:** the row is genuinely dead and `superseded` is what the
+  deployed code writes when a draft is retired (§23). Reverting would only
+  restore a lie. Round numbering is untouched either way — `nextRoundFromHistory`
+  counts reviewed rows, and this one never was (`next round: 2` before and after).
+- **It did not do what it was meant to.** The stated reason was to stop the
+  round-2 reviewer DM quoting the dead row's terms, and it does not:
+  `priorTermsFromRows` ignores column J and still picked the draft. That is
+  **§33**, fixed in code the same day, not fixed by this write.
+- **Guards used:** the script refuses any id but `a_1790584489474`, any
+  spreadsheet but the production one, and asserts the row's contributor,
+  opportunity, round and `draft` status before writing.
+
 ---
 
 ## KEEP — intended changes, do not undo
@@ -252,7 +272,9 @@ things beyond the agreement row:
   `2026-10-08T10:28:57.784Z` back). Classified **KEEP** — the repair *is* the revert of an
   accidental mutation; undoing it would re-orphan the agreements.
 
-### K10. Phase E batch deployed 2026-10-08 (final campaign deploy) — KEEP
+### K10. Phase E batch deployed 2026-10-08 — KEEP
+*("final campaign deploy" when written; superseded by K11 after §32 was found live.)*
+
 - Working tree at `d02bc1e`, then `railway up --service bot --ci`.
 - Build **`2026-10-08T14:23:22Z`** (previous: `2026-10-06T12:30:21Z`), status SUCCESS.
   Boot log clean at 14:24:09Z — Sheets connected, sweep scheduled, sessions volume mounted.
@@ -268,6 +290,22 @@ things beyond the agreement row:
   but **KEEP**: the deployed code writes column R on supersede.
 - **Undo (code):** redeploy the previous image `sha256:dae1cd14…` (or `git revert` the six
   commits + `railway up`). Nothing else to clean on the data side.
+
+### K11. §32 counter-offer attribution fix deployed 2026-10-14 — KEEP
+- Working tree at `baa5290`, then `railway up --service bot --ci`.
+- Build **`2026-10-14T12:13:48.728Z`** (previous: `2026-10-08T14:23:22Z`), status SUCCESS.
+  Boot log clean — Sheets connected, sweep scheduled every 15 min, sessions volume
+  mounted, no trailing 409.
+- **Deployed with nothing in review** — F2 had just closed and accepted, so the
+  only recent agreement was final. Same quiet-window discipline as K10.
+- What shipped: §32 only (`baa5290`) — the contributor's own ask is now passed into
+  the aggregation synthesis prompt. 169 tests, typecheck clean at deploy time.
+- **No sheet change.** Prompt-side only; `aggregatedRate` was always correct.
+- **Undo (code):** `git revert baa5290` + `railway up`. Reverting restores a DM that
+  tells the candidate the team's counter is their own ask — only do this if the fix
+  itself regresses something.
+- **Not yet deployed and sitting on top of this:** the §33 prior-terms fix. Whoever
+  deploys next ships it — see §33 for what changes in reviewer-facing copy.
 
 ---
 

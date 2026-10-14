@@ -1055,7 +1055,7 @@ opportunity to start negotiating terms:".
 `/start` afterwards (the veterinary profile is still in place), and the
 verification record gets the re-run outcome alongside the original FAIL.
 
-### 32. The counter-offer DM attributes the reviewer's number to the candidate — "your requested rate of $75" when they asked $95 (OPEN — found live during F2/E4, 2026-10-13)
+### 32. The counter-offer DM attributes the reviewer's number to the candidate — "your requested rate of $75" when they asked $95 — found live during F2/E4 2026-10-13; FIXED `baa5290`, DEPLOYED 2026-10-14 (build `2026-10-14T12:13:48Z`, K11)
 
 Agreement `a_1791888028961` (Nikola, `opp_001`, asked $95/hr at 50%). Gustavo
 countered `75` — "good profile, but above our budget for this role." — and Aleksa
@@ -1091,7 +1091,8 @@ approved; quorum closed at 2 of 3 and `aggregatedRate` was written as **75**
 **Disposition:** did **not** block F2 — Accept reconciles from `aggregatedRate`,
 not the prose, and F2 passed with the rate moving 95 → 75.
 
-**FIXED IN CODE 2026-10-14, awaiting deploy.** Reproduced first, against the live
+**FIXED AND DEPLOYED 2026-10-14** (commit `baa5290`, build
+`2026-10-14T12:13:48.728Z`, ledger K11). Reproduced first, against the live
 inputs of `a_1791888028961` (`_agg32_tmp.ts`): **5/5 runs** misattributed the $75
 ("your rate of $75", "your proposed rate of $75") and **0/5** mentioned the real
 $95 ask — structural, not model variance. Fix passes the ask into the synthesis
@@ -1099,5 +1100,44 @@ payload (`The contributor asked for $95/hr, 50% commitment.`) and instructs that
 reviewer figures are the team's counter, never the contributor's request. Re-run:
 **0/5** misattributed; sample output reads "our team is proposing a rate of $75
 per hour at the 50% commitment level you requested". 169 unit tests still pass.
-Not yet live — `git push` does not deploy this project; it needs `railway up
---service bot --ci`, and the deploy should be timed so it does not land mid-review.
+Deployed into the quiet window after F2 closed (nothing `under_review`); boot log
+clean. The live retest rides on Cycle 1 — the next mixed-path counter-offer DM.
+
+### 33. An abandoned draft shadows the reviewed round in the reviewer's "previous ask" block — FIXED IN CODE 2026-10-14, awaiting deploy
+
+Found while cleaning up the stale round-2 draft on the Aleksa + `opp_002` pair
+(ledger R7) — the cleanup was *motivated* by this and did not fix it, which is the
+useful part of the finding.
+
+- **Mechanism:** `priorTermsFromRows` (`sheets.ts:73-99`) filters only on
+  contributor + opportunity + `excludeId`, then takes **the last matching row**.
+  There is no status or review filter, so a `draft` the contributor abandoned —
+  or one retired as `superseded` — is as eligible as a round that reviewers
+  actually worked on.
+- **Live evidence:** the pair's two rows are `a_1790186286202` (round 1, $75/hr at
+  60%, reviewed, countered to **$60**) and `a_1790584489474` (round 2 draft at
+  $60/hr, never submitted). The lookup returned the draft — `{hourlyRate: 60,
+  counteredRate: null}` — so the round-2 reviewer DM would have read *"Previous
+  ask: $60/hr, 60%"* with **no** `Reviewers countered:` line at all. The one fact
+  the block exists to carry — that reviewers had already pushed $75 down to $60 —
+  was the fact it dropped.
+- **Marking the draft `superseded` changes nothing.** The selection ignores column
+  J. Worth stating plainly: the obvious data-side cleanup is not a fix here.
+- **Blast radius:** reviewer-facing copy on round ≥ 2 only
+  (`review.ts:432-441`, best-effort and null-tolerant). No data impact — nothing
+  is written from `PriorTerms`, and round numbering is unaffected because
+  `nextRoundFromHistory` already counts only reviewed rows. Reachable in
+  production without QA's help: tap **Modify Terms**, leave the draft, come back.
+- **Fix:** prefer the last row whose column N (aggregated summary) is non-empty,
+  falling back to the last attempt when the pair has no reviewed history. That is
+  the *same* "reviewed" signal `nextRoundFromHistory` counts rounds by, so the
+  round number in the DM's title and the terms in its body can no longer disagree
+  about which attempts happened.
+- **Tests:** 5 added to the existing `priorTermsFromRows` block, including the
+  exact live shape above. 174 pass (was 169), typecheck clean. Verified against
+  the production sheet: the lookup now returns `{hourlyRate: 75,
+  commitmentPercent: 60, counteredRate: 60}`.
+
+**Disposition:** not a campaign blocker — it only degrades reviewer context, and
+Cycle 1's D2 test is about the round cap, not this block. Lands with the next
+deploy; until then the live bot still quotes the draft.

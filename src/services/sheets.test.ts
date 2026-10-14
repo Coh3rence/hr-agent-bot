@@ -130,6 +130,16 @@ describe("priorTermsFromRows", () => {
     r[7] = duration;
     r[12] = counteredRate;
     r[16] = counteredCommitment;
+    // N (the aggregated summary) is what marks a row as actually reviewed; a row
+    // carrying a counter always has it.
+    if (counteredRate || counteredCommitment) r[13] = "reviewers countered";
+    return r;
+  };
+
+  /** A row that went to review and came back, with no numeric counter on it. */
+  const reviewedRow = (...args: Parameters<typeof row>) => {
+    const r = row(...args);
+    r[13] = "all reviewers approved";
     return r;
   };
 
@@ -185,5 +195,51 @@ describe("priorTermsFromRows", () => {
     const prior = priorTermsFromRows(rows, "c_1", "opp_1", "a_2");
     expect(prior?.counteredRate).toBeNull();
     expect(prior?.counteredCommitment).toBeNull();
+  });
+
+  // §33: the live shape on the Aleksa + opp_002 pair — a reviewed round 1 that
+  // was countered, then a round-2 draft abandoned before review.
+  test("an abandoned draft does not shadow the reviewed round behind it", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "75", "60", "3", "60"),
+      row("a_2", "opp_1", "c_1", "60", "60", "3"), // drafted, never reviewed
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_3")).toEqual({
+      hourlyRate: 75,
+      commitmentPercent: 60,
+      durationMonths: 3,
+      counteredRate: 60,
+      counteredCommitment: null,
+    });
+  });
+
+  test("a reviewed round with no counter still beats a later unreviewed draft", () => {
+    const rows = [
+      reviewedRow("a_1", "opp_1", "c_1", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "50", "6"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_3")?.hourlyRate).toBe(50);
+  });
+
+  test("the LATEST reviewed round wins when there are several", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "80", "60", "3", "70"),
+      row("a_2", "opp_1", "c_1", "70", "60", "3", "65"),
+      row("a_3", "opp_1", "c_1", "65", "60", "3"), // abandoned draft
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_4")?.counteredRate).toBe(65);
+  });
+
+  test("with no reviewed history the last attempt is still the prior", () => {
+    const rows = [
+      row("a_1", "opp_1", "c_1", "50", "40", "3"),
+      row("a_2", "opp_1", "c_1", "45", "50", "6"),
+    ];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_3")?.hourlyRate).toBe(45);
+  });
+
+  test("the excluded row is not eligible even when it is the reviewed one", () => {
+    const rows = [reviewedRow("a_1", "opp_1", "c_1", "50", "40", "3")];
+    expect(priorTermsFromRows(rows, "c_1", "opp_1", "a_1")).toBeNull();
   });
 });

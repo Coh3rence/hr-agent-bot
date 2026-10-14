@@ -79,8 +79,14 @@ export function priorTermsFromRows(
   const matches = rows.filter(
     (r) => r[0] && r[0] !== excludeId && r[1] === opportunityId && r[2] === contributorId
   );
-  // The tab is append-only, so the last match is the most recent attempt.
-  const row = matches[matches.length - 1];
+  // The tab is append-only, so the last match is the most recent attempt. §33: an
+  // abandoned draft is an attempt nobody reviewed, and quoting it hides the round
+  // the reviewers actually worked on — prefer the last *reviewed* row (column N,
+  // the same signal `nextRoundFromHistory` counts rounds by) and fall back to the
+  // last attempt only when the pair has no reviewed history at all.
+  const reviewed = matches.filter((r) => r[13] && String(r[13]).trim());
+  const candidates = reviewed.length ? reviewed : matches;
+  const row = candidates[candidates.length - 1];
   if (!row) return null;
 
   const numOrNull = (v: string | undefined) => {
