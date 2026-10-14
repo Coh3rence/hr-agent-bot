@@ -1103,7 +1103,7 @@ per hour at the 50% commitment level you requested". 169 unit tests still pass.
 Deployed into the quiet window after F2 closed (nothing `under_review`); boot log
 clean. The live retest rides on Cycle 1 — the next mixed-path counter-offer DM.
 
-### 33. An abandoned draft shadows the reviewed round in the reviewer's "previous ask" block — FIXED IN CODE 2026-10-14, awaiting deploy
+### 33. An abandoned draft shadows the reviewed round in the reviewer's "previous ask" block — FIXED `cbd37fa`, DEPLOYED 2026-10-14 (build `2026-10-14T13:28:21Z`, K12)
 
 Found while cleaning up the stale round-2 draft on the Aleksa + `opp_002` pair
 (ledger R7) — the cleanup was *motivated* by this and did not fix it, which is the
@@ -1139,5 +1139,7 @@ useful part of the finding.
   commitmentPercent: 60, counteredRate: 60}`.
 
 **Disposition:** not a campaign blocker — it only degrades reviewer context, and
-Cycle 1's D2 test is about the round cap, not this block. Lands with the next
-deploy; until then the live bot still quotes the draft.
+Cycle 1's D2 test is about the round cap, not this block. Deployed anyway, in the
+same quiet window (zero `under_review` rows), so Cycle 1's round-2 reviewer DM is
+the live proof: it should read *"Previous ask: $75/hr, 60%, 3 months"* followed by
+*"Reviewers countered: rate $60/hr"*.

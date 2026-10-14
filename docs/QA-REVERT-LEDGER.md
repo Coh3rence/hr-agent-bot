@@ -304,8 +304,18 @@ things beyond the agreement row:
 - **Undo (code):** `git revert baa5290` + `railway up`. Reverting restores a DM that
   tells the candidate the team's counter is their own ask — only do this if the fix
   itself regresses something.
-- **Not yet deployed and sitting on top of this:** the §33 prior-terms fix. Whoever
-  deploys next ships it — see §33 for what changes in reviewer-facing copy.
+
+### K12. §33 prior-terms fix deployed 2026-10-14 — KEEP
+- Working tree at `cbd37fa`, then `railway up --service bot --ci`.
+- Build **`2026-10-14T13:28:21.877Z`** (previous: `2026-10-14T12:13:48.728Z`), SUCCESS.
+  Boot log clean — Sheets connected, sweep scheduled, `/data/sessions` mounted.
+- **Deployed with nothing in review** — state dump immediately before showed
+  8 agreement rows and **0** `under_review`. Deliberately taken before Cycle 1
+  opened a review, because the next quiet window would not have come until the
+  campaign ended.
+- What shipped: §33 only (`cbd37fa`). 174 tests, typecheck clean at deploy time.
+- **No sheet change.** Read-path selection only.
+- **Undo (code):** `git revert cbd37fa` + `railway up`.
 
 ---
 
