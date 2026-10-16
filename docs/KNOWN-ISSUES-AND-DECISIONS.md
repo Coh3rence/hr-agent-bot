@@ -1103,6 +1103,24 @@ per hour at the 50% commitment level you requested". 169 unit tests still pass.
 Deployed into the quiet window after F2 closed (nothing `under_review`); boot log
 clean. The live retest rides on Cycle 1 — the next mixed-path counter-offer DM.
 
+**VERIFIED LIVE 2026-10-16.** The mixed path ran on `a_1792023040163` (Aleksa,
+`opp_002`, asked **$85**/hr at 50%): Simon `approve`, Nikola `counter 65`, quorum
+closed 2 of 3 at 12:23:01Z, candidate notified 12:23:09Z. Stored
+`aggregatedSummary` reads:
+
+> …the team would like to move forward with an **offer of $65 per hour** at 50%
+> commitment… We recognize this rate is **lower than what you proposed**…
+
+The reviewer's figure is named as the team's offer and the candidate's ask is
+acknowledged as the higher one — the inversion that produced "your requested rate
+of $75" is gone, on the first live mixed verdict after the fix. `aggregatedRate`
+= 65, matching the prose. Worth noting the counter carried **no** qualitative
+text: Nikola sent the bare figure `65`, so `qualitativeFeedback` holds the
+designed `(no qualitative feedback provided)` placeholder (not a parse failure —
+`parseCounterFeedback` was checked directly against `65 - above our budget for
+this role` and returns both halves). That is the weakest input the synthesis can
+get — no stated reason to paraphrase — and attribution still held. §32 closed.
+
 ### 33. An abandoned draft shadows the reviewed round in the reviewer's "previous ask" block — FIXED `cbd37fa`, DEPLOYED 2026-10-14 (build `2026-10-14T13:28:21Z`, K12)
 
 Found while cleaning up the stale round-2 draft on the Aleksa + `opp_002` pair
@@ -1143,3 +1161,18 @@ Cycle 1's D2 test is about the round cap, not this block. Deployed anyway, in th
 same quiet window (zero `under_review` rows), so Cycle 1's round-2 reviewer DM is
 the live proof: it should read *"Previous ask: $75/hr, 60%, 3 months"* followed by
 *"Reviewers countered: rate $60/hr"*.
+
+**VERIFIED LIVE 2026-10-15.** Gustavo's reviewer DM for `a_1792023040163`
+(dispatched 2026-10-15T00:10:40Z, after the K12 build) reads verbatim:
+
+> Revised proposal for review — round 2 of 2
+>
+> Previous ask: $75/hr, 60%, 3 months
+> Reviewers countered: rate $60/hr
+
+Confirmed by forwarded screenshot. The block now quotes `a_1790186286202` — the
+round the reviewers actually worked on — and carries the `$60` counter that the
+pre-fix selection dropped. The abandoned `a_1790584489474` draft, still sitting
+in the tab between that row and this one, no longer shadows it. Title and body
+agree on the round number, which was the point of reusing `nextRoundFromHistory`'s
+"reviewed" signal. §33 closed.

@@ -197,6 +197,30 @@ things beyond the agreement row:
   if C4 ever needs re-running; otherwise this is only QA test data on a QA row and
   can be left or the row retired with R2.
 
+### R9. The QA candidate is in cooldown, and the Cycle 1 agreement is `rejected` — **OPEN, 2026-10-16**
+
+- **Set to:** `Contributors` `c_1790157082079` (Aleksa) status `cooldown`,
+  `cooldownUntil 2026-10-19T12:33:11.776Z`; `Agreements` `a_1792023040163`
+  status `under_review` → `rejected`.
+- **Was:** contributor `active` with no cooldown; the agreement `under_review`
+  holding a closed 2-of-3 verdict (Simon approve, Nikola counter 65) and an
+  `aggregatedRate` of 65.
+- **Written by the bot, not by hand** — the candidate tapped **Walk away** on the
+  capped counter-offer. This is F4, the last unrun case in the verification
+  document, and the first time any contributor has held status `cooldown`.
+- **Why it matters for 3 days:** the cooldown gate refuses a new application from
+  this row until 2026-10-19T12:33Z. Any further live run on *this* candidate is
+  blocked until then — including a re-run of D2 or §19, both of which need to
+  reach negotiation. Nothing in the deliverable needs it, but a session that
+  starts on 2026-10-17 and finds the bot declining Aleksa should look here first
+  rather than suspecting the gate.
+- **Revert:** clear `status` back to `active` and empty `cooldownUntil` on
+  `c_1790157082079`. The agreement's `rejected` status should **not** be reverted
+  — it is the true outcome of a real tap and the evidence F4 rests on.
+- **Resolution deferred:** keep until the campaign is signed off. If the client
+  wants a clean slate at handover, this row is QA test data and R2 retires it
+  wholesale, which supersedes this entry.
+
 ---
 
 ## KEEP — intended changes, do not undo
