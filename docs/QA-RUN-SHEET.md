@@ -146,3 +146,100 @@ If a run spoils, retry on `opp_003` for a fresh round budget.
 Afterwards: fill the remaining Result columns in `QA-VERIFICATION.md`, close the
 ledger, and raise decision **D-e** with Gustavo (who cleans up the test
 identities in the live org) — non-blocking but should not be a surprise.
+
+**Reached 2026-10-16.** All 32 recorded. What follows is not part of the 32.
+
+---
+
+# Closing session — the follow-ups (written 2026-10-16)
+
+The 32 agreed cases are closed. A coverage audit the same day found paths that
+none of those cases happens to touch, recorded as **FU-1 … FU-6** in
+`QA-VERIFICATION.md` §7. Four of them are live-testable and **three of those four
+fall out of a single chained run** — one candidate, one role, two rounds. This
+sheet is that run.
+
+Why it is worth a session rather than a handover note: FU-1 is the only path that
+writes into the client's **live** Collabberry org and on-chain, and the code in it
+changed on 2026-10-06, after its last proof on 2026-09-09.
+
+## Staffing — decide this first
+
+The chain needs a candidate who is **not** in the reviewer pool, **not** in
+cooldown, and can link a **fresh wallet** at the end.
+
+- **Option B (preferred) — candidate Aleksa, pool of three.** Quorum is 2 of 3,
+  so **Nikola rejects + Simon approves** reaches a split verdict without
+  depending on Gustavo, whose taps cost a full day on 2026-10-15. Blocked until
+  the cooldown on `c_1790157082079` expires **2026-10-19T12:33Z**, or sooner by
+  reverting ledger **R9** (legitimate — F4's evidence is already recorded with
+  timestamps; the revert is a documented undo, not a cover-up). Needs a wallet
+  that is not the org-admin wallet `0xd02f…5878`.
+- **Option A (fallback) — candidate Nikola, pool of two.** No cooldown to wait
+  out and it retires his admin seat early (ledger **R6**, wanted anyway), but
+  quorum becomes 2 of 2: **both** Gustavo and Simon must tap, and a silent
+  Gustavo spoils the round at the 48h escalation. Also adds one more test
+  identity to the live org (decision D-e) and asks an outside tester for a wallet.
+
+> **Do not revert R6 before this session if Option B is chosen.** Demoting Nikola
+> shrinks the pool to two and puts Gustavo back on the critical path. Revoke his
+> admin row immediately *after* the session instead — the access risk is days, not
+> weeks, and it is tracked.
+
+## The chain — one candidate, one role, two rounds
+
+Use `opp_003` for a fresh round budget. Round 1 is the split verdict; round 2 is
+the one that completes.
+
+1. [ ] Candidate onboards (or `/start`s), selects the role, proposes a rate
+       **inside** budget, submits for review.
+2. [ ] **One reviewer taps Reject** (with a reason — Reject requires typed text),
+       **one taps Approve**. Nothing else.
+3. [ ] **FU-2 PASS if:** the candidate's message offers **Modify / Walk away
+       only** — no Accept button, and no acceptance at their own asking rate.
+       *First time Reject has ever been pressed in production; §16 and §19 stop
+       resting on harness-written rows.*
+4. [ ] Candidate taps **Modify Terms** — this is round 1 of 2, so the cap must
+       **not** fire — revises the terms, and **submits** the revision.
+5. [ ] **FU-3 PASS if:** between the Modify tap and the submit, the original row
+       is still `under_review` (the standing offer survives being explored away
+       from), and only on submit does it go `superseded` with column R
+       `supersededBy` naming the new row. *The behaviour change Gustavo approved
+       as D-d, shipped 2026-10-06 and never watched.* Check with
+       `bun run qa:state` plus a row dump.
+6. [ ] Round 2: **both reviewers approve** (or one counters, one approves) so the
+       verdict is acceptable this time.
+7. [ ] Candidate taps **Accept**.
+8. [ ] **FU-1 PASS if** the whole bridge completes on current code: invite link
+       arrives → candidate opens it and signs up with the **fresh wallet** →
+       tells the bot they have signed up → `betaAppAgreementId` populates on the
+       agreement row → contributor row goes `hired` with `walletAddress` and
+       `collabberryUserId` set.
+9. [ ] Open the frontend **Team** view as org admin: the **new** hire renders with
+       the agreed rate and commitment, and the Market Rate column reads
+       hourly × 160. *Re-proves G6/G7 against a fresh hire rather than the
+       September one.*
+
+## Two solo add-ons, same sitting (~5 min, no reviewers)
+
+10. [ ] **FU-4 — before `2026-10-19T12:33Z`:** send `/start` from the cooled-down
+        candidate `c_1790157082079`. **PASS if** the bot refuses with the cooldown
+        message instead of offering matches. If Option B reverted R9, do this
+        *first*, before clearing the cooldown — it is the only window.
+11. [ ] **`/add_opportunity` once.** **PASS if** a create receipt arrives. The §25
+        and §26 fixes to that path shipped in K8 and the command has not been run
+        since. Use a throwaway role so `opp_001`–`opp_003` stay clean, and pause
+        it afterwards.
+
+## Not live tests
+
+- **FU-5** (`answerCallbackQuery` ordering, `bot.ts:143-149`) — code decision: fix
+  in a quiet window or hand over documented as §34.
+- **FU-6** (tester's admin row) — one-cell write, straight after the session.
+
+## Afterwards
+
+Record each FU outcome in `QA-VERIFICATION.md` §7 beside its row rather than as a
+new test case — the 32 are closed and should not grow. Any change this session
+makes to production gets a ledger entry, and R9's disposition is settled either
+way once FU-4 has run.
