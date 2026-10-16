@@ -31,12 +31,13 @@ Health verified 2026-09-07 09:23 UTC via `railway run --service bot bun scripts/
 | `535329585` (Aleksa) | Candidate + org admin | Runs the section B admin commands before applying; the code excludes a contributor from their own reviewer pool, so he cannot review his own proposal |
 | `1971913512` (Simon, @qbfrank) | Reviewer | First half of quorum |
 | `302836662` (Gustavo, @sepu85) | Reviewer (client) | Second half of quorum |
+| `8983159792` (Nikola) | Reviewer (QA tester) | Added 2026-10-14 to make the pool odd. Button-only seat — Approve and Counter, never an admin command. His access is reverted at handover (ledger R6) |
 
-Reviewer pool is therefore `1971913512` and `302836662`, quorum 2 of 2.
+**The pool grew mid-campaign, and the Result column says which size each case ran at.** September runs had two reviewers, `1971913512` and `302836662` — quorum 2 of 2, where majority and unanimity coincide. From 2026-10-14 the pool is those two plus `8983159792`: **quorum 2 of 3**, which is what the majority-quorum, late-responder and round-cap cases were run at. A contributor is always excluded from reviewing their own proposal, so the candidate never counts toward the pool.
 
 > **Before you start — both reviewers must have opened the bot.** Telegram will not deliver a message to anyone who has never started a chat with the bot, and the failure is silent rather than an error. If either reviewer has not pressed Start at https://t.me/Coh3erence_hr_bot, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.
 >
-> If one reviewer cannot participate live, run `bun scripts/remove-admin.ts --id <their id>` to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. Note this makes E4 and E5 not observable — see the note under section E.
+> If one reviewer cannot participate live, run `bun scripts/remove-admin.ts --id <their id>` to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. E4 and E5 have since been recorded at a pool of three, so this fallback no longer costs coverage. Note the script rewrites the whole `AuthorizedUsers` block rather than one cell.
 
 ## 2. How to use this document
 
@@ -44,8 +45,8 @@ Each test has a **fixed expected result** agreed in advance. Walk them in order 
 
 > **Backfilled 2026-10-05.** Result columns were filled from the recorded evidence of the
 > September–October QA campaign (sheet rows, timestamps, on-chain records), not from a single
-> sitting. Rows marked *Not yet run* are scheduled in the closeout plan
-> (`docs/QA-COMPLETION-PLAN.md`) and will be filled as they execute.
+> sitting. The rows then marked *Not yet run* were executed over the following eleven days and
+> carry their own dates; as of 2026-10-16 none remain.
 
 ## 3. Configured business rules (verified in code, 2026-08-21)
 
@@ -157,18 +158,26 @@ Configuration that is deliberately relaxed for testing and must be tightened bef
 |---|---|---|
 | `NODE_ENV` | `production` | Already done |
 | `ALLOW_SELF_REVIEW` | `false` — self-approval is structurally impossible | Already done |
-| Reviewer pool | Two admins (quorum of 2), both reachable | Wider pool as the team grows |
+| Reviewer pool | Three admins (quorum 2 of 3), all reachable — two for the September cases, three from 2026-10-14 | Wider pool as the team grows; the QA tester's seat is removed at handover (R6) |
 | Test data | Cleared 2026-09-07 — sheet holds no prior records | Already done |
 
 > The self-review escape hatch that previously allowed the whole loop to be driven from one Telegram account has been switched off for this session. Every decision below is made by a distinct participant: the candidate cannot approve their own agreement.
 
 ## 7. Outcome
 
-**Tests passed:** 20 / 32 proven as of 2026-10-06 — B3 failed on first run (§27), the fix deployed same day (K8) and the re-run passed; no open failures. The remaining 12 are scheduled (see `docs/QA-COMPLETION-PLAN.md`)
+**Tests passed:** **32 / 32**, campaign closed 2026-10-16. Two needed a fix before they passed, and both histories are kept in the table above rather than overwritten: B3 failed on first run (§27 — every opportunity edit was rejected by Google), fixed and re-run the same day; C4 failed (§31 — no match-score floor made the graceful decline unreachable), fixed and re-run post-deploy. No case is outstanding and no case is failing.
+
+**What 32 / 32 does and does not mean.** Every row was executed against production, and the Result column carries its own date and evidence. It does **not** mean every path in the code has been seen live: the campaign was built around the 32 agreed cases, and an audit on 2026-10-16 found paths that no case happens to touch. Those are listed below as follow-ups rather than left implicit — none is a known defect, each is an absence of evidence.
+
 **Failures / follow-ups:**
 
 | ID | Issue | Severity | Owner | Action |
 |---|---|---|---|---|
-| | | | | |
+| FU-1 | The accept → invite → signup → wallet-link → on-chain chain was last proven **2026-09-09**. `resolution.ts` changed twice on 2026-10-06 (`6ed1c34` §23, `df642e3` lineage) and both changes sit inside that path. F2 deliberately stopped short of the bridge, so nothing since September has exercised it | **High** — it writes into the client's live Collabberry org | QA | Re-run section G end to end on current code with a fresh candidate and wallet |
+| FU-2 | No reviewer has ever pressed **Reject** in production — every live verdict in the project's history was approve or counter. The all-reject guard (§16) and the split-verdict suppression (§19) rest on unit tests and harness-written feedback rows | Medium | QA | Make the verdict a split **approve + reject** in the same session as FU-1 |
+| FU-3 | §23 retire-on-commit — the behaviour change the client approved (D-d) — shipped unobserved. The one live Modify tap hit the round-cap refusal instead, so the revise-and-resubmit path has no live evidence | Medium | QA | Tap Modify **below** the cap, revise, resubmit, and confirm the standing offer survives until the revision is committed |
+| FU-4 | Cooldown is proven as a stored value (F4), not as a gate — no `/start` has been refused by it | Low | QA | Send `/start` from `c_1790157082079` before `2026-10-19T12:33Z`, while the cooldown is live |
+| FU-5 | `answerCallbackQuery()` runs **after** `handleReview` / `handleResolution` (`bot.ts:143-149`), unlike the `auth:` and `select_opp:` branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user | Low — latent, not observed firing | Dev | Two-line fix (answer first) plus a deploy in a quiet window, or hand over documented as §34 |
+| FU-6 | The QA tester (`8983159792`) still holds `admin`, which is also the admin-command gate — write access to the client's live opportunity rows | **High** — access, not behaviour | Dev | Demote that one row to `contributor` before handover (ledger R6) |
 
 **Client sign-off:** ______________  **Date:** ______________
