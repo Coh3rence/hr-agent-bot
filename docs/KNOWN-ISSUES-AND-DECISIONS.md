@@ -858,6 +858,14 @@ full fix but adds a session phase for little gain at current admin volume — no
 
 ### 26. Every `/add_opportunity` confirmation is dropped — the ID's underscore breaks legacy Markdown — FIXED AT THE PROVEN SITE, DEPLOYED 2026-10-06 (K8); FULL AUDIT FIXED IN CODE 2026-10-06, awaiting Phase E deploy
 
+> **VERIFIED LIVE 2026-10-16.** `/add_opportunity` run once as a throwaway
+> (`opp_1792158537582`, "QA Receipt Check", `$40-50/hr` at 10-20%, `createdBy
+> 535329585`) — the first run of the command since the K8 deploy. The row landed
+> **and the receipt arrived**, carrying the `opp_` id whose underscore used to
+> take the whole message down. Admin confirmed receipt. The fix is now evidenced
+> rather than inferred from the code path. §25's bare-command reply is a separate
+> branch and remains unexercised live — low value, deliberately not run.
+
 **Witnessed live during QA case B2.** The opportunity `opp_1791280007760` was written to the
 sheet correctly, but the admin never saw *"Opportunity created!"*. Railway logs show why:
 

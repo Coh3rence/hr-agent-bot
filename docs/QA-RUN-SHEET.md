@@ -222,14 +222,15 @@ the one that completes.
 
 ## Two solo add-ons, same sitting (~5 min, no reviewers)
 
-10. [ ] **FU-4 — before `2026-10-19T12:33Z`:** send `/start` from the cooled-down
-        candidate `c_1790157082079`. **PASS if** the bot refuses with the cooldown
-        message instead of offering matches. If Option B reverted R9, do this
-        *first*, before clearing the cooldown — it is the only window.
-11. [ ] **`/add_opportunity` once.** **PASS if** a create receipt arrives. The §25
-        and §26 fixes to that path shipped in K8 and the command has not been run
-        since. Use a throwaway role so `opp_001`–`opp_003` stay clean, and pause
-        it afterwards.
+10. [x] **FU-4 PASS 2026-10-16** — `/start` from the cooled-down candidate was
+        refused verbatim: *"You're currently in a cooldown period. You can
+        re-apply in 3 day(s)…"* — no "Welcome back", no match list. Taken before
+        any R9 revert, which was the only window.
+11. [x] **PASS 2026-10-16** — `/add_opportunity` run once as a throwaway:
+        `opp_1792158537582` ("QA Receipt Check", $40-50/hr at 10-20%) landed on
+        the sheet **and** the receipt arrived, which is the §26 fix evidenced for
+        the first time since K8. Still to do: **pause it**, or it competes for
+        match slots in the closing run.
 
 ## Not live tests
 

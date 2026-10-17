@@ -220,6 +220,16 @@ things beyond the agreement row:
 - **Resolution deferred:** keep until the campaign is signed off. If the client
   wants a clean slate at handover, this row is QA test data and R2 retires it
   wholesale, which supersedes this entry.
+- **Cooldown half REVERTED 2026-10-16** (`_clearcool_tmp.ts`, `--apply`, K:L of
+  row 3 only): `cooldown` → `active`, `cooldownUntil` emptied. Verified after the
+  write — id, telegram id, handle and skills unchanged.
+  **Both halves of the evidence were banked first**, which is the only reason
+  this was safe to do: F4 recorded the stored value and its timestamps, and FU-4
+  recorded the gate actually refusing a `/start` with the verbatim 3-day message.
+  Cleared so the same account could serve as the candidate in the closing session
+  the same day instead of idling until 2026-10-19T12:33Z.
+  The agreement's `rejected` status was **not** touched — it remains the true
+  outcome of a real tap.
 
 ---
 
