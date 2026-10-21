@@ -639,10 +639,10 @@ carry their own dates; as of 2026-10-16 none remain.</p>
 </tr>
 <tr>
 <td>FU-5</td>
-<td><code>answerCallbackQuery()</code> runs <strong>after</strong> <code>handleReview</code> / <code>handleResolution</code> (<code>bot.ts:143-149</code>), unlike the <code>auth:</code> and <code>select_opp:</code> branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user</td>
+<td><del><code>answerCallbackQuery()</code> runs <strong>after</strong> <code>handleReview</code> / <code>handleResolution</code> (<code>bot.ts:143-149</code>), unlike the <code>auth:</code> and <code>select_opp:</code> branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user</del> <strong>FIXED IN CODE 2026-10-21 (commit <code>06c6aa2</code>), awaiting deploy</strong></td>
 <td>Low — latent, not observed firing</td>
 <td>Dev</td>
-<td>Two-line fix (answer first) plus a deploy in a quiet window, or hand over documented as §34</td>
+<td><strong>DONE in code.</strong> Four lines moved — <code>await ctx.answerCallbackQuery()</code> now runs first in both branches, matching the <code>auth:</code> and <code>select_opp:</code> ordering. Typecheck clean, no logic change. Documented as §34 in <code>KNOWN-ISSUES-AND-DECISIONS.md</code>. <strong>Awaiting deploy</strong> — Railway workspace <code>polux0&#39;s Projects</code> is in Limited Access and refusing <code>railway up</code> with &quot;Deploys have been paused temporarily,&quot; so this fix will ship with the next successful deploy whenever the workspace is unblocked. Same shape as §23/§24/§26/§31 — fixed in <code>main</code>, awaiting the next quiet-window deploy</td>
 </tr>
 <tr>
 <td>FU-6</td>

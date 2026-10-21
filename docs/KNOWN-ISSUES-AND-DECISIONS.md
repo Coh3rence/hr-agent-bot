@@ -1185,7 +1185,7 @@ in the tab between that row and this one, no longer shadows it. Title and body
 agree on the round number, which was the point of reusing `nextRoundFromHistory`'s
 "reviewed" signal. §33 closed.
 
-### 34. `answerCallbackQuery` ran *after* the handler for `review:` and `resolution:` — a throw inside either became a silent spinner — FIXED, awaiting deploy
+### 34. `answerCallbackQuery` ran *after* the handler for `review:` and `resolution:` — a throw inside either became a silent spinner — FIXED IN CODE 2026-10-21 (commit `06c6aa2`), awaiting deploy
 
 Found by the follow-up audit on 2026-10-19 as **FU-5**. The callback-query
 dispatcher in `src/bot.ts` had two different orderings for its four branches:
