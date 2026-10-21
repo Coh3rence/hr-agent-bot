@@ -131,7 +131,19 @@ things beyond the agreement row:
   written through `railway run`. Reading the dev sheet by mistake shows an almost-empty
   database and invites the conclusion that production has been wiped.
 
-### R6. The QA tester holds an `admin` row — **OPEN, 2026-10-14**
+### R6. The QA tester holds an `admin` row — **CLOSED 2026-10-21, resolution: REVERT (removal)**
+
+- **Closed by:** AuthorizedUsers dump 2026-10-21 shows the three expected admin
+  rows only (`535329585` Aleksa, `302836662` Gustavo, `1971913512` Simon). The
+  `8983159792` row is gone. A later run of `scripts/demote-admin.ts --id
+  8983159792` refused the operation (`No AuthorizedUsers row for telegramId
+  8983159792. Nothing changed.`), confirming the removal is real on the live
+  sheet rather than a cached view. The fallback branch below ("delete the row
+  outright") was taken in an earlier session rather than the primary demote.
+  Access is revoked; the promotion itself remains documented here as the audit
+  trail.
+
+**Original ledger entry (preserved for history):**
 
 - **Set to:** `AuthorizedUsers` row 5 = `8983159792, admin` (Nikola, the QA tester).
 - **Was:** `8983159792, contributor`, present **three times** (DEF-5 — repeated

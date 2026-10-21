@@ -53,8 +53,8 @@
 <body>
 <h1>Collabberry HR Agent — QA Verification Document</h1>
 <p><strong>Environment:</strong> Production<br>
-<strong>Date of this run:</strong> ______________<br>
-<strong>Tester:</strong> ______________<br>
+<strong>Date of this run:</strong> 2026-09-07 → ongoing (rolling campaign — each Result carries its own date)<br>
+<strong>Tester:</strong> Aleksa (@aleksaprosperitylabs)<br>
 <strong>Client witness:</strong> ______________</p>
 <h2>1. Systems under test</h2>
 <p>Health verified 2026-09-07 09:23 UTC via <code>railway run --service bot bun scripts/health-check.ts</code> — all six checks PASS.</p>
@@ -131,14 +131,25 @@
 <td>Reviewer (client)</td>
 <td>Second half of quorum</td>
 </tr>
+<tr>
+<td><code>8983159792</code> (Nikola)</td>
+<td>Reviewer (QA tester)</td>
+<td>Added 2026-10-14 to make the pool odd. Button-only seat — Approve and Counter, never an admin command. His access is reverted at handover (ledger R6)</td>
+</tr>
 </tbody></table>
-<p>Reviewer pool is therefore <code>1971913512</code> and <code>302836662</code>, quorum 2 of 2.</p>
+<p><strong>The pool grew mid-campaign, and the Result column says which size each case ran at.</strong> September runs had two reviewers, <code>1971913512</code> and <code>302836662</code> — quorum 2 of 2, where majority and unanimity coincide. From 2026-10-14 the pool is those two plus <code>8983159792</code>: <strong>quorum 2 of 3</strong>, which is what the majority-quorum, late-responder and round-cap cases were run at. A contributor is always excluded from reviewing their own proposal, so the candidate never counts toward the pool.</p>
 <blockquote>
 <p><strong>Before you start — both reviewers must have opened the bot.</strong> Telegram will not deliver a message to anyone who has never started a chat with the bot, and the failure is silent rather than an error. If either reviewer has not pressed Start at <a href="https://t.me/Coh3erence_hr_bot">https://t.me/Coh3erence_hr_bot</a>, section E will stall until the 48-hour escalation rather than completing. Confirm both are reachable before beginning.</p>
-<p>If one reviewer cannot participate live, run <code>bun scripts/remove-admin.ts --id &lt;their id&gt;</code> to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. Note this makes E4 and E5 not observable — see the note under section E.</p>
+<p>If one reviewer cannot participate live, run <code>bun scripts/remove-admin.ts --id &lt;their id&gt;</code> to reduce the pool to one reviewer (quorum 1) so the session completes deterministically, and restore the row afterwards. E4 and E5 have since been recorded at a pool of three, so this fallback no longer costs coverage. Note the script rewrites the whole <code>AuthorizedUsers</code> block rather than one cell.</p>
 </blockquote>
 <h2>2. How to use this document</h2>
 <p>Each test has a <strong>fixed expected result</strong> agreed in advance. Walk them in order — later tests depend on state created by earlier ones. Record the outcome in the Result column as PASS / FAIL / N-A and put anything surprising in Notes. A FAIL is not necessarily a defect; note it and continue so the session isn&#39;t blocked.</p>
+<blockquote>
+<p><strong>Backfilled 2026-10-05.</strong> Result columns were filled from the recorded evidence of the
+September–October QA campaign (sheet rows, timestamps, on-chain records), not from a single
+sitting. The rows then marked <em>Not yet run</em> were executed over the following eleven days and
+carry their own dates; as of 2026-10-16 none remain.</p>
+</blockquote>
 <h2>3. Configured business rules (verified in code, 2026-08-21)</h2>
 <p>These are the rules the tests below assert against. All are environment-overridable without a code change.</p>
 <table>
@@ -203,24 +214,24 @@
 <td>Bot responds</td>
 <td>Send <code>/start</code> to @Coh3erence_hr_bot</td>
 <td>Bot replies; conversation begins</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Both contributors onboarded via <code>/start</code> (2026-09-07, 2026-09-23)</td>
 </tr>
 <tr>
 <td>A2</td>
 <td>Unauthorised user is gated</td>
 <td><code>/start</code> from an account not in AuthorizedUsers</td>
 <td>Access is refused, no opportunity data leaks</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>2026-10-09: 4th account (&quot;Nikola&quot;, id 8983159792, no username) sent <code>/start</code>; admin DM with name/ID + Contributor/Admin/Ignore buttons received (screenshot). Refusal copy is a static string in the same branch that produced the admin DM (gate.ts) — branch provably executed, nothing dynamic to leak. §26 fix visible: username-less requester rendered without breaking the DM</td>
 </tr>
 <tr>
 <td>A3</td>
 <td>Admin authorisation</td>
 <td>Admin runs <code>/authorize</code> for a new Telegram id</td>
 <td>User is added and can now proceed</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>2026-10-09 authorised via the inline &quot;Authorize as Contributor&quot; button (sheet row <code>8983159792, contributor</code> — landed 3×, DEF-5, dedupe queued); 2026-10-11 the user&#39;s <code>/start</code> cleared the gate and reached <code>matching</code> (contributor <code>c_1791746130193</code>, session-verified). Note: first post-auth <code>/start</code> attempt (2026-10-09) never reached the bot — user had messaged a look-alike bot handle</td>
 </tr>
 </tbody></table>
 <h3>B — Admin opportunity management</h3>
@@ -241,32 +252,32 @@
 <td>List opportunities</td>
 <td><code>/list_opportunities</code></td>
 <td>Current roles returned with budget and status</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-05)</td>
+<td>All three seeded roles returned with commitment, budget and status</td>
 </tr>
 <tr>
 <td>B2</td>
 <td>Create opportunity</td>
 <td><code>/add_opportunity</code>, follow prompts</td>
 <td>New role appears in B1 and in the sheet</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-05)</td>
+<td><code>opp_1791280007760</code> &quot;Full-Stack Web3 Developer&quot; written to Opportunities sheet, status open. Two defects found live: bare command is a dead end (§25); confirmation reply dropped by Telegram Markdown 400 (§26) — the write succeeded regardless</td>
 </tr>
 <tr>
 <td>B3</td>
 <td>Edit opportunity</td>
 <td><code>/edit_opportunity</code></td>
 <td>Change persists and is reflected in B1</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-06, after fix)</td>
+<td>First attempt FAILED 2026-10-06 ~10:10Z (§27: Google 400, 12 values into 11 columns; payload also carried <code>hourlyRateMin: 0</code>). K8 fix deployed <code>12:30:21Z</code>; re-run ~13:19Z: max 75→80 persisted <strong>with min kept at 50</strong>, and a <code>status open</code> edit reopened the paused role — the reopen path §27 also unblocked</td>
 </tr>
 <tr>
 <td>B4</td>
 <td>Pause opportunity</td>
 <td><code>/pause_opportunity</code></td>
 <td>Role stops being offered to new contributors</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-06)</td>
+<td><code>opp_1791280007760</code> paused at ~12:38Z, 8 min after the K8 fix deployed — first successful <code>updateOpportunity</code> write ever. Confirmation reply arrived; <code>/list_opportunities</code> showed 🟡 paused, and a <code>/start</code> match run while paused offered only the 3 seeded roles — the paused role was excluded. Reopened afterwards via <code>status open</code> (run out of order, before B3/E6)</td>
 </tr>
 </tbody></table>
 <h3>C — Contributor discovery and matching</h3>
@@ -286,32 +297,32 @@
 <td>Natural-language intake</td>
 <td>Describe skills conversationally, not as a form</td>
 <td>Bot extracts skills, rate range, availability, timezone without rigid prompts</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Skills extracted conversationally into both Contributors rows (2026-09-07, 2026-09-23)</td>
 </tr>
 <tr>
 <td>C2</td>
 <td>Structured capture</td>
 <td>Check the Contributors sheet row</td>
 <td>Skills, commitment %, rate min/max, timezone, location all populated correctly</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Both rows fully populated — skills, commitment %, rate min/max, timezone, location</td>
 </tr>
 <tr>
 <td>C3</td>
 <td>Role match</td>
 <td>Continue to matching</td>
 <td>Bot proposes a relevant role with a match score</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>settlementLikelihood</code> populated on every agreement row</td>
 </tr>
 <tr>
 <td>C4</td>
 <td>Poor-fit handling</td>
 <td>Offer skills unrelated to any open role</td>
 <td>Bot declines gracefully rather than forcing a bad match</td>
-<td></td>
-<td></td>
+<td>FAIL → PASS after fix</td>
+<td>2026-10-08 first run FAIL: veterinary-surgery profile offered all three open roles as selectable matches at 11–15% — no match-score floor, decline branch unreachable (§31). Fixed same day (<code>ea5da9c</code>, floor at the red-badge boundary of 50), shipped in the Phase E deploy (K10). Re-run post-deploy: &quot;No strong matches found right now. We&#39;ll keep your profile on file.&quot; — no buttons. Run also exposed §30 (identity regeneration on re-onboarding; repaired, ledger K9)</td>
 </tr>
 </tbody></table>
 <h3>D — Negotiation</h3>
@@ -331,24 +342,24 @@
 <td>Counter-offer</td>
 <td>Propose a rate above budget</td>
 <td>Bot negotiates; settlement likelihood reflects distance from budget</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>opp_002</code> budget $45–70: ask $75 → likelihood 74; ask $60 → 92</td>
 </tr>
 <tr>
 <td>D2</td>
 <td>Round cap</td>
 <td>Tap &quot;Modify Terms&quot; after a second review</td>
 <td>Revision limit reached; only Accept / Walk away are offered — no third round</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-16)</td>
+<td>First live run, on <code>a_1792023040163</code> (Aleksa + <code>opp_002</code>, round 2 of 2, $85/hr). Quorum closed 2 of 3 at 12:23:01Z (Simon <code>approve</code>, Nikola <code>counter 65</code>); the candidate tapped <strong>Modify Terms</strong> on the resulting counter-offer and the bot refused verbatim: <em>&quot;We&#39;ve reached the limit of 2 negotiation rounds for this role. You can accept the reviewers&#39; offer as it stands, or step away — no hard feelings either way.&quot;</em> — leaving only <strong>Accept offer</strong> / <strong>Walk away</strong>, no revision prompt (<code>resolution.ts:202-215</code>). The cap reads the persisted <code>negotiationRound</code>, not the session, and <code>nextRoundFromHistory</code> counts only <em>reviewed</em> rows — so the two consumed rounds are <code>a_1790186286202</code> ($75/hr, countered to $60) and this one, while the abandoned <code>a_1790584489474</code> and superseded <code>a_1791987837366</code> drafts correctly consumed nothing</td>
 </tr>
 <tr>
 <td>D3</td>
 <td>Submission</td>
 <td>Accept terms</td>
 <td>Agreement row created with status submitted; reviewers notified</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>a_1790186286202</code> submitted 2026-09-23T17:58:06Z, both reviewers notified</td>
 </tr>
 </tbody></table>
 <h3>E — Review and quorum</h3>
@@ -368,52 +379,54 @@
 <td>Reviewer notification</td>
 <td>Check reviewer account</td>
 <td>Reviewer receives the proposal with approve / counter options</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Gustavo and Simon both received the proposal and acted on it (2026-09-24)</td>
 </tr>
 <tr>
 <td>E2</td>
 <td>Approve path</td>
 <td>Reviewer approves</td>
 <td>Decision recorded in ReviewFeedback</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Simon approve recorded 2026-09-24T20:53:20Z</td>
 </tr>
 <tr>
 <td>E3</td>
 <td>Counter path</td>
 <td>Reviewer counters with a different rate</td>
 <td>Suggested rate parsed and stored</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Gustavo counter recorded 2026-09-24T09:12:53Z, <code>suggestedRate = 60</code> parsed and stored</td>
 </tr>
 <tr>
 <td>E4</td>
 <td>Majority quorum</td>
 <td>With a pool of n reviewers</td>
 <td>Review closes at <code>floor(n/2)+1</code> responses, not unanimity</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong></td>
+<td>2026-10-13, first live run at a pool of 3 (Aleksa/Gustavo/Simon; candidate excluded). <code>a_1791888028961</code> closed on the <strong>2nd of 3</strong> responses — Gustavo <code>counter 75</code> 13:24:02Z, Aleksa <code>approve</code> 17:04:52Z — aggregating to <code>aggregatedRate 75</code> with <code>candidateNotifiedAt 17:05:00Z</code> while Simon had not responded at all. Unanimity was neither required nor waited for. Defect §32 found in the same run: the counter-offer <strong>prose</strong> misattributes the $75 to the candidate (&quot;your requested rate of $75&quot;) — copy only, the stored rate is correct</td>
 </tr>
 <tr>
 <td>E5</td>
 <td>Late responder</td>
 <td>Reviewer responds after quorum</td>
 <td>Late response ignored, outcome unchanged</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-15)</td>
+<td>First live run, on <code>a_1791888028961</code> — the E4 agreement, closed <code>approved</code> on 2026-10-13 by Gustavo + Aleksa with Simon never having responded. Simon tapped <strong>Approve</strong> on his original (still-visible) reviewer DM ~2 days after the decision. The bot refused him verbatim: <em>&quot;This proposal is no longer open for review — the contributor revised it, or it&#39;s already been decided. If the revised version needs your input, it&#39;ll arrive as a new message.&quot;</em> (forwarded screenshot). ReviewFeedback still holds exactly 2 rows for the agreement — <code>Gustavo:counter, Aleksa:approve</code> — so nothing was recorded and the <code>aggregatedRate 75</code> outcome is unchanged. Guard: <code>ensureOpenForReview</code> (review.ts:99), which also strips the stale keyboard so the dead buttons cannot be tapped twice</td>
 </tr>
 <tr>
 <td>E6</td>
 <td>48h escalation</td>
 <td>Leave a review unanswered past the window</td>
 <td>Sweep escalates the agreement (runs every 15 min)</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>Fired 2026-10-08T14:15:52Z, inside the predicted 14:06–14:21Z window. Sheet: <code>a_1791295559074</code> → <code>escalated</code>, no counter-offer generated (aggregation columns empty, correct for no-quorum). Log: <code>sweepExpiredReviews: a_1791295559074 escalated (no quorum: 0/2)</code> — pool correctly excludes the candidate; both reviewer DMs dispatched with no send errors logged; Gustavo confirmed receipt 2026-10-09 (forwarded the DM verbatim). Prerequisite drama: the agreement was orphaned hours earlier by §30 and repaired via ledger K9</td>
 </tr>
 </tbody></table>
 <blockquote>
 <p><strong>On E4 and E5.</strong> With a two-reviewer pool, <code>floor(2/2)+1 = 2</code>, so majority and unanimity coincide and there is no third reviewer left to respond late — neither case is observable in a live run at this pool size. Both are instead evidenced deterministically by the unit tests in <code>src/services/quorum.test.ts</code>, which assert the threshold across pool sizes 1–5 (a pool of 3 closing at 2, and of 5 at 3), that a late responder does not change an already-satisfied outcome, and that out-of-pool and repeat votes are not double-counted. Run with <code>bun test</code>.</p>
+<p><em>Update 2026-10-05:</em> a fourth, non-admin candidate account is being onboarded, which makes the reviewer pool all three admins (quorum 2 of 3) — both cases become observable live and are scheduled in the closeout plan.</p>
+<p><em>Closed 2026-10-15:</em> both ran live at a pool of 3 and passed — E4 on 2026-10-13, E5 on 2026-10-15 against that same closed agreement. The unit tests remain the evidence for pool sizes we cannot staff.</p>
 </blockquote>
 <h3>F — Resolution</h3>
 <table>
@@ -432,32 +445,32 @@
 <td>Aggregation</td>
 <td>Multiple reviewers give differing rates</td>
 <td>Feedback aggregated into a single coherent counter-offer</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>aggregatedRate = 60</code> + coherent prose in column N, written 2026-09-24T20:53:29Z</td>
 </tr>
 <tr>
 <td>F2</td>
 <td>Reconciliation</td>
 <td>Reviewer counter changes the rate</td>
 <td>Final agreement terms match the reviewer&#39;s counter, not the original ask</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong></td>
+<td>2026-10-14, live, end-to-end with real reviewers — the priority case of the closeout. <code>a_1791888028961</code>: candidate asked <strong>$95</strong>, Gustavo countered <strong>75</strong>, candidate tapped Accept, and the contract rate on the row moved <strong>95 → 75</strong> with status <code>approved</code> (commitment 50%, 3 months, round 1 preserved). Reconciliation reads <code>aggregatedRate</code>, so §32&#39;s misworded prose had no effect on the figure agreed. <code>betaAppAgreementId</code> empty by design — the candidate was instructed not to open the signup link, so no on-chain agreement was created</td>
 </tr>
 <tr>
 <td>F3</td>
 <td>Candidate accepts</td>
 <td>Accept the resolved offer</td>
 <td>Agreement status → approved</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>a_1788962327012</code> status <code>approved</code> (2026-09-09)</td>
 </tr>
 <tr>
 <td>F4</td>
 <td>Candidate rejects</td>
 <td>Decline the offer</td>
 <td>Contributor enters 3-day cooldown</td>
-<td></td>
-<td></td>
+<td><strong>PASS</strong> (2026-10-16)</td>
+<td>First live run — no contributor had ever held status <code>cooldown</code> before this. Candidate tapped <strong>Walk away</strong> on the capped counter-offer for <code>a_1792023040163</code> at 12:33:11Z. Sheet: <code>c_1790157082079</code> → status <code>cooldown</code>, <code>cooldownUntil 2026-10-19T12:33:11.776Z</code> (exactly <code>COOLDOWN_DAYS = 3</code>), and the agreement → <code>rejected</code>; zero rows left <code>under_review</code>. Bot replied <em>&quot;Thank you for your time… You&#39;re welcome to re-apply after a 3-day reflection period. We&#39;ll keep your profile on file.&quot;</em> (<code>resolution.ts:243-251</code>, <code>closeAsDeclined</code>). The session was reset, so the candidate cannot re-enter the dead proposal. Reverting the cooldown is ledger <strong>R9</strong></td>
 </tr>
 </tbody></table>
 <h3>G — Collabberry integration (the critical path)</h3>
@@ -477,64 +490,64 @@
 <td>Invite issued</td>
 <td>On acceptance</td>
 <td>Bot sends a signup link to <code>/member-sign-up?invitationToken=…</code></td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>collabberryInviteToken = 06ceee59-545e-452e-a836-5669f9115bf4</code> (2026-09-09)</td>
 </tr>
 <tr>
 <td>G2</td>
 <td>Signup completes</td>
 <td>Open link, connect a <strong>fresh</strong> wallet, sign up</td>
 <td>Account created in Collabberry</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>collabberryUserId = e2a00877-9249-4fcc-a037-2943ba60d534</code></td>
 </tr>
 <tr>
 <td>G3</td>
 <td>Confirmation tap</td>
 <td>Return to Telegram, tap &quot;I&#39;ve signed up&quot;</td>
 <td>Bot links the wallet and creates the on-chain agreement</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>walletAddress = 0x290a26a086d4ee4437c80aa1d669576cb7512061</code>, on-chain agreement created (Arbitrum One)</td>
 </tr>
 <tr>
 <td>G4</td>
 <td>Sheet updated</td>
 <td>Check Contributors row</td>
 <td>status <code>hired</code>, walletAddress and collabberryUserId populated</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>c_1788807562702</code> status <code>hired</code>, wallet and userId both populated</td>
 </tr>
 <tr>
 <td>G5</td>
 <td>Agreement recorded</td>
 <td>Check Agreements row</td>
 <td><code>betaAppAgreementId</code> populated</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td><code>betaAppAgreementId = 231b0916-c607-4fba-9a24-68d593dcfc3c</code></td>
 </tr>
 <tr>
 <td>G6</td>
 <td>Renders in app</td>
 <td>Open frontend Team view as org admin</td>
 <td>Contributor and agreement visible with correct rate and commitment</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>2026-10-07, browser inspection as admin <code>0xd02f…5878</code>: Gustavo (Collabberry display name &quot;Guena Cosa&quot;) renders as Community Manager, 50% commitment, agreement view/edit icons present. Two prior test identities also visible (July E2E &quot;Aleksa&quot; Frontend Developer $8,000; admin row without agreement) — cleanup is decision D-e</td>
 </tr>
 <tr>
 <td>G7</td>
 <td>Rate conversion</td>
 <td>Compare hourly ask to agreement marketRate</td>
 <td>marketRate = hourly × 160</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>2026-10-07, same view: Market Rate column reads <strong>$6,400</strong> = $40/hr × 160 (<code>FTE_HOURS_PER_MONTH</code>); monetary comp $0 (all TeamPoints, <code>fiatRequested = 0</code> default)</td>
 </tr>
 <tr>
 <td>G8</td>
 <td>Single-use invite</td>
 <td>Attempt to reuse a consumed invite token</td>
 <td>Second redemption refused cleanly</td>
-<td></td>
-<td></td>
+<td>PASS</td>
+<td>2026-10-07, reuse attempted with a fresh wallet (<code>0x74ec…</code>) against the consumed G1 token. DB verified: invitation <code>06ceee59…</code> unchanged (<code>isActive=0, usageCount=1/1</code>) and the attempt was refused org membership (<code>organization_id=NULL</code>). Caveat: refusal is server-side only — the frontend renders the full signup form before validating the token, and the attempt leaves an orphaned Users row (<code>92a9a5cc</code>, &quot;Coh3rence Tester&quot;) behind. Orphan + the unused live invite <code>87903afd…</code> (minted 2026-09-14) added to the D-e cleanup list</td>
 </tr>
 </tbody></table>
 <h2>5. Known limitations — disclose before testing</h2>
@@ -569,8 +582,8 @@
 </tr>
 <tr>
 <td>Reviewer pool</td>
-<td>Two admins (quorum of 2), both reachable</td>
-<td>Wider pool as the team grows</td>
+<td>Three admins (quorum 2 of 3), all reachable — two for the September cases, three from 2026-10-14</td>
+<td>Wider pool as the team grows; the QA tester&#39;s seat is removed at handover (R6)</td>
 </tr>
 <tr>
 <td>Test data</td>
@@ -582,8 +595,10 @@
 <p>The self-review escape hatch that previously allowed the whole loop to be driven from one Telegram account has been switched off for this session. Every decision below is made by a distinct participant: the candidate cannot approve their own agreement.</p>
 </blockquote>
 <h2>7. Outcome</h2>
-<p><strong>Tests passed:</strong> ____ / 32
-<strong>Failures / follow-ups:</strong></p>
+<p><strong>Tests passed:</strong> <strong>32 / 32</strong>, campaign closed 2026-10-16. Two needed a fix before they passed, and both histories are kept in the table above rather than overwritten: B3 failed on first run (§27 — every opportunity edit was rejected by Google), fixed and re-run the same day; C4 failed (§31 — no match-score floor made the graceful decline unreachable), fixed and re-run post-deploy. No case is outstanding and no case is failing.</p>
+<p><strong>What 32 / 32 does and does not mean.</strong> Every row was executed against production, and the Result column carries its own date and evidence. It does <strong>not</strong> mean every path in the code has been seen live: the campaign was built around the 32 agreed cases, and an audit on 2026-10-16 found paths that no case happens to touch. Those are listed below as follow-ups rather than left implicit — none was a known defect, each was an absence of evidence.</p>
+<p><strong>The follow-ups were then run, 2026-10-16 to 2026-10-17.</strong> Four of the six are closed by live evidence: the cooldown gate (FU-4), the first real <strong>Reject</strong> ever pressed in production and the split-verdict suppression it proves (FU-2), retire-on-commit observed in both halves (FU-3), and the full accept → invite → signup → wallet → on-chain chain re-proven on current code with a fresh wallet (FU-1). The audit&#39;s suspicion was right to raise them and wrong about the risk — every path behaved as designed. What the runs <em>did</em> surface was a seventh item that no amount of reading would have found: the signup leg only succeeded on a retry (FU-7). <strong>Remaining at handover: FU-5</strong> (a latent silent-failure defect, never observed firing), <strong>FU-6</strong> (an access cleanup), and <strong>FU-7</strong> (an onboarding-friction item whose root cause is still a hypothesis).</p>
+<p><strong>Failures / follow-ups:</strong></p>
 <table>
 <thead>
 <tr>
@@ -595,17 +610,59 @@
 </tr>
 </thead>
 <tbody><tr>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>FU-1</td>
+<td><del>The accept → invite → signup → wallet-link → on-chain chain was last proven <strong>2026-09-09</strong>. <code>resolution.ts</code> changed twice on 2026-10-06 (<code>6ed1c34</code> §23, <code>df642e3</code> lineage) and both changes sit inside that path</del> <strong>CLOSED 2026-10-17</strong></td>
+<td><strong>High</strong> — it writes into the client&#39;s live Collabberry org</td>
+<td>QA</td>
+<td><strong>DONE.</strong> Ran end to end on current code as the continuation of FU-3&#39;s round 2: <code>a_1792257419170</code> (Community Manager, $38/hr, 25%, 3 months) drew approvals from Nikola and Gustavo, closing quorum 2 of 3 and aggregating to <code>aggregatedRate 38</code> / <code>aggregatedCommitment 25</code> with <em>&quot;All reviewers approved.&quot;</em> <strong>Accept</strong> minted the invite, signup completed against a <strong>fresh wallet <code>0xA07a0ee3986b585E0b40a3d35eC5d4Cc90e99fD4</code></strong> — deliberately not the org admin <code>0xd02f…5878</code>, so the wallet-link step was genuinely exercised — and <code>betaAppAgreementId f6a5f2d6-1383-4ad7-9157-5bbcfc046fde</code> was written back with contributor <code>c_1790157082079</code> flipped to <code>hired</code>. The path the Oct 6 deploys touched is now proven, not assumed. <strong>Two friction points surfaced on the way — see FU-7</strong></td>
+</tr>
+<tr>
+<td>FU-2</td>
+<td><del>No reviewer has ever pressed <strong>Reject</strong> in production — every live verdict in the project&#39;s history was approve or counter. The split-verdict suppression (§19) rests on unit tests and harness-written feedback rows</del> <strong>CLOSED 2026-10-17</strong></td>
+<td>Medium</td>
+<td>QA</td>
+<td><strong>DONE.</strong> <code>a_1792160941359</code> (Community Manager, $45/hr, 30%, round 1) drew the first real <strong>Reject</strong> in the project&#39;s history — Nikola <code>8983159792</code>, <em>&quot;Not the right fit for this role right now.&quot;</em>, 2026-10-16T15:50:30Z — against Simon&#39;s <code>approve</code>, closing quorum 2 of 3. Aggregation ran at 2026-10-17T16:13:25.821Z and left <code>aggregatedRate</code> <strong>empty</strong>, which is the condition §19 guards: neither reviewer named a figure, so &quot;Accept&quot; could only have meant accepting the candidate&#39;s own objected-to rate. The candidate&#39;s DM offered <strong>Modify Terms / Walk away only — no Accept button</strong> (confirmed on-device), matching <code>presentation.ts:97-118</code>; the <code>Accept</code> keyboard at <code>presentation.ts:136-141</code> was never reached. §19 is now evidenced on a live split verdict, not just in unit tests</td>
+</tr>
+<tr>
+<td>FU-3</td>
+<td><del>§23 retire-on-commit — the behaviour change the client approved (D-d) — shipped unobserved. The one live Modify tap hit the round-cap refusal instead, so the revise-and-resubmit path has no live evidence</del> <strong>CLOSED 2026-10-17</strong></td>
+<td>Medium</td>
+<td>QA</td>
+<td><strong>DONE.</strong> Modify tapped on <code>a_1792160941359</code> at round 1 of 2 — below the cap, so it reached the revise flow rather than the refusal. Checked in two halves. <strong>Pre-submit:</strong> the revision existed as <code>a_1792257419170</code> <code>draft</code> ($38/hr, 25%) while the original still read <code>under_review</code> with <code>supersededBy</code> empty — the standing offer survived the draft, which is the whole point of D-d. <strong>Post-submit</strong> (2026-10-17T17:16:59.377Z): the original flipped to <code>superseded</code> with <code>supersededBy: a_1792257419170</code>, and the revision went <code>under_review</code> at <code>negotiationRound: 2</code>. Round 2 — not 3 — confirms <code>nextRoundFromHistory</code> counts only reviewed rows. <code>settlementLikelihood</code> also recomputed 82 → 86 as the rate moved toward budget. Retire happens on commit, never on draft</td>
+</tr>
+<tr>
+<td>FU-4</td>
+<td><del>Cooldown is proven as a stored value (F4), not as a gate — no <code>/start</code> has been refused by it</del> <strong>CLOSED 2026-10-16</strong></td>
+<td>Low</td>
+<td>QA</td>
+<td><strong>DONE.</strong> <code>/start</code> sent from <code>535329585</code> while <code>c_1790157082079</code> held <code>cooldown</code>; the gate refused it verbatim: <em>&quot;You&#39;re currently in a cooldown period. You can re-apply in 3 day(s). This gives both parties time to reflect before the next round.&quot;</em> No &quot;Welcome back&quot;, no match list — <code>gate.ts:49-62</code> returns before the returning-contributor branch, and the day count rounds up correctly against <code>cooldownUntil 2026-10-19T12:33:11Z</code>. The gate is now evidenced, not just the stored value</td>
+</tr>
+<tr>
+<td>FU-5</td>
+<td><code>answerCallbackQuery()</code> runs <strong>after</strong> <code>handleReview</code> / <code>handleResolution</code> (<code>bot.ts:143-149</code>), unlike the <code>auth:</code> and <code>select_opp:</code> branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user</td>
+<td>Low — latent, not observed firing</td>
+<td>Dev</td>
+<td>Two-line fix (answer first) plus a deploy in a quiet window, or hand over documented as §34</td>
+</tr>
+<tr>
+<td>FU-6</td>
+<td><del>The QA tester (<code>8983159792</code>) still holds <code>admin</code>, which is also the admin-command gate — write access to the client&#39;s live opportunity rows</del> <strong>CLOSED 2026-10-21</strong></td>
+<td>Low</td>
+<td>Dev</td>
+<td><strong>DONE.</strong> AuthorizedUsers dump against the production sheet (<code>1qM9_Ppm7nmY0EL9eHmQEn-qHZm0q8ESIzlGz70XEvt0</code>) shows only the three expected rows: <code>535329585 | admin</code> (Aleksa), <code>302836662 | admin</code> (Gustavo), <code>1971913512 | admin</code> (Simon). The tester row is gone entirely — the fallback branch of ledger <strong>R6</strong> (&quot;delete the row outright&quot;) was applied in an earlier session. Access is revoked; audit trail of the promotion lives in R6</td>
+</tr>
+<tr>
+<td>FU-7</td>
+<td>Signup succeeded, but only on a retry. Two things happened first, both observed live on 2026-10-17 and neither reproducible from the sheet afterwards. <strong>(a)</strong> The signup page answered <strong>&quot;no token provided&quot;</strong>. The bot mints <code>&lt;base&gt;?&lt;param&gt;=&lt;token&gt;</code> (betaApp.ts:85-87); the code defaults are <code>https://beta.collabberry.xyz/join</code> + <code>invitation</code> (config.ts:24-29), while the local env resolves <code>http://localhost:5173/member-sign-up</code> + <code>invitationToken</code> — different path <em>and</em> different param name. If Railway has either variable unset it falls through to a default the frontend does not read, which is exactly this symptom. <strong>(b)</strong> MetaMask warned <em>&quot;This site shows signs of phishing or wallet-draining activity.&quot;</em> Most likely its blocklist reacting to the hosting pattern rather than a real threat, but a real contributor would see the same warning and many would abandon onboarding there</td>
+<td><strong>Medium</strong> — (a) blocks onboarding when it fires, (b) costs candidate trust</td>
+<td>Dev</td>
+<td>Confirm <code>BETA_APP_INVITE_URL</code> and <code>BETA_APP_INVITE_PARAM</code> are explicitly set in Railway and match the deployed frontend&#39;s route and query key — do not rely on the code defaults. For (b), serve the signup flow from the custom domain rather than a platform-generated subdomain, and if the custom domain is still flagged, file a false-positive removal against MetaMask&#39;s <code>eth-phishing-detect</code> list. <strong>Unresolved — the invite link&#39;s actual domain was never captured during the run, so (a)&#39;s root cause is a hypothesis, not a finding</strong></td>
 </tr>
 </tbody></table>
 <p><strong>Client sign-off:</strong> ______________  <strong>Date:</strong> ______________</p>
 
 <div class="doc-footer">
-  Collabberry HR Agent — QA Verification. Generated 2026-09-08.
+  Collabberry HR Agent — QA Verification. Generated 2026-10-19.
 </div>
 </body>
 </html>
