@@ -1184,3 +1184,41 @@ pre-fix selection dropped. The abandoned `a_1790584489474` draft, still sitting
 in the tab between that row and this one, no longer shadows it. Title and body
 agree on the round number, which was the point of reusing `nextRoundFromHistory`'s
 "reviewed" signal. §33 closed.
+
+### 34. `answerCallbackQuery` ran *after* the handler for `review:` and `resolution:` — a throw inside either became a silent spinner — FIXED, awaiting deploy
+
+Found by the follow-up audit on 2026-10-19 as **FU-5**. The callback-query
+dispatcher in `src/bot.ts` had two different orderings for its four branches:
+
+- `auth:` and `select_opp:` called `ctx.answerCallbackQuery()` **before** doing
+  work — ack first, then the state change.
+- `review:` and `resolution:` called the handler first and `answerCallbackQuery`
+  **after** — handler first, then the ack.
+
+In the second ordering, if `handleReview` or `handleResolution` throws, the ack
+never fires. Telegram keeps the loading spinner on the reviewer's button for
+roughly 15 seconds and the user sees nothing — no reply, no error, no state
+change, no breadcrumb for later diagnosis. The grammy `bot.catch` handler would
+log the throw, but by the time the reviewer looks at the chat the only visible
+artefact is a dead button.
+
+Never observed firing in 32 recorded cases plus six follow-ups — the handlers
+have been stable. Catalogued because the pattern is a latent single point of
+failure: any future change inside those handlers that can throw would be hidden
+behind the inconsistency.
+
+**Fix:** move `await ctx.answerCallbackQuery()` to the top of both branches,
+matching `auth:` and `select_opp:`. Four lines moved, no logic change.
+
+**Why answering first is safe:** `answerCallbackQuery` only dismisses the
+spinner — it does not commit anything else. If the handler then throws, the
+user has at least seen the tap acknowledged and the error can surface through
+whatever reply path the handler already uses (or `bot.catch`), rather than
+Telegram's generic timeout. The two branches already running this order
+(`auth:`, `select_opp:`) have been in production since the campaign opened
+without issue.
+
+**Retest shape:** one callback tap — any Approve, Reject, Counter, Accept,
+Modify, or Walk-away — succeeds end-to-end on the live bot. The pattern is
+indistinguishable from pre-fix behaviour on the happy path, so the retest
+confirms "no regression" rather than "fix fires."

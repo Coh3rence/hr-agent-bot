@@ -142,11 +142,11 @@ bot.on("callback_query:data", async (ctx) => {
     await ctx.answerCallbackQuery();
     await handleNegotiation(ctx);
   } else if (data.startsWith("review:")) {
+    await ctx.answerCallbackQuery();
     await handleReview(ctx);
-    await ctx.answerCallbackQuery();
   } else if (data.startsWith("resolution:")) {
-    await handleResolution(ctx);
     await ctx.answerCallbackQuery();
+    await handleResolution(ctx);
   }
 });
 
