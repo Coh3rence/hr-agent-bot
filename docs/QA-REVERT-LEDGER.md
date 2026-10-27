@@ -388,6 +388,19 @@ things beyond the agreement row:
 - **No sheet change.** Read-path selection only.
 - **Undo (code):** `git revert cbd37fa` + `railway up`.
 
+### K13. Prosperity Labs admin row removed from `AuthorizedUsers` 2026-10-27 — KEEP
+- **Removed:** `AuthorizedUsers` row `535329585 | admin` (Aleksa, Prosperity Labs).
+- **Why:** handoff cleanup. Keeps the vendor out of the client's live reviewer
+  pool and admin-command surface once the project is signed off.
+- **Via:** `bun scripts/remove-admin.ts --sheet-id 1qM9_Ppm… --id 535329585`
+  — rewrites the tab (filter + clear + rewrite), header preserved.
+- **Post-state:** two rows remain — `302836662` (Gustavo) and `1971913512`
+  (Simon). Quorum arithmetic for any new proposal: two admins, candidate
+  excluded ⇒ `floor(2/2)+1 = 2` out of two reviewers.
+- **No code change, no deploy.** Sheet-only.
+- **Undo:** `bun scripts/add-admin.ts --sheet-id 1qM9_Ppm… --id 535329585 --role admin`
+  if post-handoff support ever requires it.
+
 ---
 
 ## Authorized users — one added row, tracked as R6
