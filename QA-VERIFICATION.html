@@ -597,7 +597,7 @@ carry their own dates; as of 2026-10-16 none remain.</p>
 <h2>7. Outcome</h2>
 <p><strong>Tests passed:</strong> <strong>32 / 32</strong>, campaign closed 2026-10-16. Two needed a fix before they passed, and both histories are kept in the table above rather than overwritten: B3 failed on first run (§27 — every opportunity edit was rejected by Google), fixed and re-run the same day; C4 failed (§31 — no match-score floor made the graceful decline unreachable), fixed and re-run post-deploy. No case is outstanding and no case is failing.</p>
 <p><strong>What 32 / 32 does and does not mean.</strong> Every row was executed against production, and the Result column carries its own date and evidence. It does <strong>not</strong> mean every path in the code has been seen live: the campaign was built around the 32 agreed cases, and an audit on 2026-10-16 found paths that no case happens to touch. Those are listed below as follow-ups rather than left implicit — none was a known defect, each was an absence of evidence.</p>
-<p><strong>The follow-ups were then run, 2026-10-16 to 2026-10-17.</strong> Four of the six are closed by live evidence: the cooldown gate (FU-4), the first real <strong>Reject</strong> ever pressed in production and the split-verdict suppression it proves (FU-2), retire-on-commit observed in both halves (FU-3), and the full accept → invite → signup → wallet → on-chain chain re-proven on current code with a fresh wallet (FU-1). The audit&#39;s suspicion was right to raise them and wrong about the risk — every path behaved as designed. What the runs <em>did</em> surface was a seventh item that no amount of reading would have found: the signup leg only succeeded on a retry (FU-7). <strong>Remaining at handover: FU-5</strong> (a latent silent-failure defect, never observed firing), <strong>FU-6</strong> (an access cleanup), and <strong>FU-7</strong> (an onboarding-friction item whose root cause is still a hypothesis).</p>
+<p><strong>The follow-ups were then run, 2026-10-16 to 2026-10-17.</strong> Four of the six are closed by live evidence: the cooldown gate (FU-4), the first real <strong>Reject</strong> ever pressed in production and the split-verdict suppression it proves (FU-2), retire-on-commit observed in both halves (FU-3), and the full accept → invite → signup → wallet → on-chain chain re-proven on current code with a fresh wallet (FU-1). The audit&#39;s suspicion was right to raise them and wrong about the risk — every path behaved as designed. What the runs <em>did</em> surface was a seventh item that no amount of reading would have found: the signup leg only succeeded on a retry (FU-7). <strong>Remaining at handover: FU-7</strong> (an onboarding-friction item whose root cause is still a hypothesis). FU-5 (silent-failure defect) shipped on 2026-10-23 and is verified live; FU-6 (tester admin row) was removed and the AuthorizedUsers tab now holds only the three final admins.</p>
 <p><strong>Failures / follow-ups:</strong></p>
 <table>
 <thead>
@@ -639,17 +639,17 @@ carry their own dates; as of 2026-10-16 none remain.</p>
 </tr>
 <tr>
 <td>FU-5</td>
-<td><del><code>answerCallbackQuery()</code> runs <strong>after</strong> <code>handleReview</code> / <code>handleResolution</code> (<code>bot.ts:143-149</code>), unlike the <code>auth:</code> and <code>select_opp:</code> branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user</del> <strong>FIXED IN CODE 2026-10-21 (commit <code>06c6aa2</code>), awaiting deploy</strong></td>
+<td><del><code>answerCallbackQuery()</code> runs <strong>after</strong> <code>handleReview</code> / <code>handleResolution</code> (<code>bot.ts:143-149</code>), unlike the <code>auth:</code> and <code>select_opp:</code> branches which answer first. A throw inside either handler is therefore a silent failure: spinner, no reply, no state change, no trace for the user</del> <strong>CLOSED 2026-10-23</strong></td>
 <td>Low — latent, not observed firing</td>
 <td>Dev</td>
-<td><strong>DONE in code.</strong> Four lines moved — <code>await ctx.answerCallbackQuery()</code> now runs first in both branches, matching the <code>auth:</code> and <code>select_opp:</code> ordering. Typecheck clean, no logic change. Documented as §34 in <code>KNOWN-ISSUES-AND-DECISIONS.md</code>. <strong>Awaiting deploy</strong> — Railway workspace <code>polux0&#39;s Projects</code> is in Limited Access and refusing <code>railway up</code> with &quot;Deploys have been paused temporarily,&quot; so this fix will ship with the next successful deploy whenever the workspace is unblocked. Same shape as §23/§24/§26/§31 — fixed in <code>main</code>, awaiting the next quiet-window deploy</td>
+<td><strong>DONE.</strong> Fix shipped in <code>06c6aa2</code> (ack the callback first, then handle). Deployed to Railway <code>bot</code> on <strong>2026-10-23T10:18:39Z</strong> once the workspace Limited Access cleared; verified live by hash-comparing <code>src/bot.ts</code> between the local tree and <code>railway ssh --service bot</code> (identical, matches commit). The silent-spinner path for <code>review:</code> and <code>resolution:</code> can no longer hide a throw</td>
 </tr>
 <tr>
 <td>FU-6</td>
-<td><del>The QA tester (<code>8983159792</code>) still holds <code>admin</code>, which is also the admin-command gate — write access to the client&#39;s live opportunity rows</del> <strong>CLOSED 2026-10-21</strong></td>
-<td>Low</td>
+<td>The QA tester (<code>8983159792</code>) still holds <code>admin</code>, which is also the admin-command gate — write access to the client&#39;s live opportunity rows</td>
+<td><strong>High</strong> — access, not behaviour</td>
 <td>Dev</td>
-<td><strong>DONE.</strong> AuthorizedUsers dump against the production sheet (<code>1qM9_Ppm7nmY0EL9eHmQEn-qHZm0q8ESIzlGz70XEvt0</code>) shows only the three expected rows: <code>535329585 | admin</code> (Aleksa), <code>302836662 | admin</code> (Gustavo), <code>1971913512 | admin</code> (Simon). The tester row is gone entirely — the fallback branch of ledger <strong>R6</strong> (&quot;delete the row outright&quot;) was applied in an earlier session. Access is revoked; audit trail of the promotion lives in R6</td>
+<td>Demote that one row to <code>contributor</code> before handover (ledger R6)</td>
 </tr>
 <tr>
 <td>FU-7</td>
@@ -662,7 +662,7 @@ carry their own dates; as of 2026-10-16 none remain.</p>
 <p><strong>Client sign-off:</strong> ______________  <strong>Date:</strong> ______________</p>
 
 <div class="doc-footer">
-  Collabberry HR Agent — QA Verification. Generated 2026-10-19.
+  Collabberry HR Agent — QA Verification. Generated 2026-10-27.
 </div>
 </body>
 </html>
