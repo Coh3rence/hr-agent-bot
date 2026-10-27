@@ -13,7 +13,7 @@ All three milestones are **complete** and the full QA campaign is **closed at 32
 
 Production is healthy and reachable; the authorized reviewer pool is reset to its final three accounts; the self-review bypass is structurally off (`NODE_ENV=production` + `ALLOW_SELF_REVIEW=false`); the invite link and param that drive signup are explicitly set on Railway.
 
-**The project is ready for client sign-off.** Two decisions remain, both for the client/developer rather than for engineering — see §6.
+**The project is ready for client sign-off.** The vendor admin row was removed on 2026-10-27 as the handoff cleanup; one housekeeping question — whether to keep or wipe the QA-campaign data on the production sheet — remains for the client to decide, actionable at any time after sign-off (see §6).
 
 ---
 
@@ -36,11 +36,10 @@ Re-check at any time with `railway run --service bot bun scripts/health-check.ts
 
 | Telegram id | Role | Plays |
 |---|---|---|
-| `535329585` | admin | Aleksa (Prosperity Labs — developer) |
 | `302836662` | admin | Gustavo (client) |
 | `1971913512` | admin | Simon (client-side reviewer) |
 
-Quorum for a proposal is `floor(n/2)+1` of the pool minus the candidate — so three admins gives quorum 2, two admins (candidate excluded) gives quorum 2.
+Quorum for a proposal is `floor(n/2)+1` of the pool minus the candidate — so two admins with the candidate excluded gives quorum 2 of 2. The Prosperity Labs admin row was removed on 2026-10-27 as the handoff cleanup; the vendor is no longer in the live reviewer pool or on the admin-command surface (ledger K13; reversible via `scripts/add-admin.ts` if post-handoff support ever requires it).
 
 **Prod-safety configuration (verified live):**
 
@@ -133,7 +132,7 @@ Written as an honest list on 2026-10-16, this was an audit of what the 32 happen
 - **FU-3** — §23 retire-on-commit observed in both halves (draft safe, commit retires).
 - **FU-4** — cooldown gate refused `/start` with the 3-day message.
 - **FU-5** — §34 deployed and verified live by hash compare on 2026-10-23.
-- **FU-6** — the QA tester's admin row removed; `AuthorizedUsers` holds only the three final admins.
+- **FU-6** — the QA tester's admin row removed; `AuthorizedUsers` was reset to the three final admins, then the Prosperity Labs row was removed on 2026-10-27 as the handoff cleanup (ledger K13), leaving the two client admins (Gustavo, Simon).
 - **FU-7** (open, scoped) — see §5.
 
 ---
@@ -171,15 +170,11 @@ Deliberate, accepted limitations of the MVP (full detail in `docs/KNOWN-ISSUES-A
 
 ---
 
-## 6. Two decisions remaining for the client / developer
+## 6. Housekeeping decisions
 
-Neither is an engineering defect. Both are explicit choices to make before client sign-off.
+1. **Developer admin row — RESOLVED 2026-10-27.** `535329585` (Aleksa, Prosperity Labs) was removed from `AuthorizedUsers` as the handoff cleanup. The live reviewer pool is now the two client admins (Gustavo, Simon) only. Recorded as ledger entry K13; reversible via `scripts/add-admin.ts` if post-handoff support ever requires it.
 
-1. **Does the developer admin row stay on `AuthorizedUsers` after handoff?**
-   `535329585` (Aleksa, Prosperity Labs) is currently one of the three admins. Keeping it means Prosperity Labs can continue to review and support post-handoff; removing it is the stricter "no vendor access after sign-off" posture. If removal is chosen, it is one script invocation.
-
-2. **Is the QA-campaign data in the production sheet kept as evidence or wiped for a clean start?**
-   Three contributor rows, twelve agreement rows and sixteen review-feedback rows exist on the prod sheet — these are the actual 32 / 32 campaign records (including the on-chain agreement proofs cited above). Options: leave in place as live-run evidence; archive to a backup tab; or zero out so the client starts against an empty roster. A reset script exists (`scripts/reset-test-data.ts`) and preserves a dated backup.
+2. **QA-campaign data on the production sheet — OPEN.** Three contributor rows, twelve agreement rows and sixteen review-feedback rows exist on the prod sheet — these are the actual 32 / 32 campaign records (including the on-chain agreement proofs cited above). Options: leave in place as live-run evidence; archive to a backup tab; or zero out so the client starts against an empty roster. A reset script exists (`scripts/reset-test-data.ts`) and preserves a dated backup. **Deferred to the client's preference, actionable at any time after sign-off.**
 
 ---
 
@@ -200,7 +195,7 @@ Neither is an engineering defect. Both are explicit choices to make before clien
 ## 8. Next steps
 
 1. **Client review of this document plus `QA-VERIFICATION.pdf`.**
-2. **Both decisions in §6 answered.** If the second decision is "wipe", run it on an agreed date.
-3. **Client countersigns `QA-VERIFICATION.md` §7** (the sign-off line) and `docs/DELIVERY-STATUS.md` is treated as the delivery statement.
-4. **Payment initiation per the engagement terms.**
+2. **Client countersigns `QA-VERIFICATION.md` §7** (the sign-off line) and `docs/DELIVERY-STATUS.md` is treated as the delivery statement.
+3. **Payment initiation per the engagement terms.**
+4. **Client's call on the QA-campaign data** (§6 item 2) — leave as live-run evidence, archive, or wipe. Actionable at any time; not a sign-off blocker.
 5. **Post-handoff:** operations runbook is `docs/DEPLOYMENT-RAILWAY.md`; incident paths are logged with sheet-read scripts and `railway logs --service bot`.

@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collabberry HR Agent — Delivery Status</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1d21; line-height: 1.55; max-width: 1000px;
+    margin: 0 auto; padding: 40px 32px; font-size: 14px;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 18px; margin: 34px 0 12px; padding-bottom: 6px;
+    border-bottom: 2px solid #e3e6ea; page-break-after: avoid;
+  }
+  h3 { font-size: 15px; margin: 24px 0 8px; color: #33383d; page-break-after: avoid; }
+  p { margin: 10px 0; }
+  table {
+    border-collapse: collapse; width: 100%; margin: 14px 0;
+    font-size: 12.5px; page-break-inside: avoid;
+  }
+  th {
+    background: #f4f6f8; text-align: left; font-weight: 600;
+    border: 1px solid #d7dbe0; padding: 7px 9px;
+  }
+  td { border: 1px solid #d7dbe0; padding: 7px 9px; vertical-align: top; }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  code {
+    background: #f0f2f4; padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+  }
+  blockquote {
+    margin: 14px 0; padding: 10px 16px; background: #fbf7ec;
+    border-left: 3px solid #d9a441; color: #4a4335;
+  }
+  blockquote p { margin: 0; }
+  ol, ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  a { color: #1a5fb4; }
+  hr { border: 0; border-top: 1px solid #e3e6ea; margin: 26px 0; }
+  strong { font-weight: 600; }
+  .doc-footer {
+    margin-top: 40px; padding-top: 12px; border-top: 1px solid #e3e6ea;
+    font-size: 11px; color: #7a8189;
+  }
+  @media print { body { padding: 0; max-width: none; } a { color: #1a1d21; } }
+</style>
+</head>
+<body>
+<h1>HR AI Agent — Delivery Status</h1>
+<p><strong>Project:</strong> HR AI Agent MVP for Collabberry
+<strong>Client:</strong> <a href="https://github.com/Coh3rence/">Coh3rence</a> / <a href="https://github.com/collabberry/">Collabberry</a>
+<strong>Developer:</strong> Prosperity Labs
+<strong>Status as of:</strong> 2026-10-27</p>
+<hr>
+<h2>Summary</h2>
+<p>All three milestones are <strong>complete</strong> and the full QA campaign is <strong>closed at 32 / 32</strong> against the live production environment, with the follow-up audit cases (FU-1 … FU-7) also run. Every bot bug surfaced during the campaign has been fixed and deployed to Railway; the latest build, <strong>2026-10-23T10:18:39Z</strong>, carries the final fix (§34, silent-spinner on reviewer callbacks). The deployed source is identical to <code>main</code> on GitHub — verified by hash-comparing <code>src/bot.ts</code> between the local tree and the Railway container.</p>
+<p>Production is healthy and reachable; the authorized reviewer pool is reset to its final three accounts; the self-review bypass is structurally off (<code>NODE_ENV=production</code> + <code>ALLOW_SELF_REVIEW=false</code>); the invite link and param that drive signup are explicitly set on Railway.</p>
+<p><strong>The project is ready for client sign-off.</strong> The vendor admin row was removed on 2026-10-27 as the handoff cleanup; one housekeeping question — whether to keep or wipe the QA-campaign data on the production sheet — remains for the client to decide, actionable at any time after sign-off (see §6).</p>
+<hr>
+<h2>Live environment</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Health (re-check with the script below)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Telegram bot</td>
+<td><a href="https://t.me/Coh3erence_hr_bot">@Coh3erence_hr_bot</a> — id <code>8811416846</code>, Railway service <code>bot</code></td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Backend API</td>
+<td><code>backend-production-53b74.up.railway.app</code> — Railway</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Database (backend)</td>
+<td>MySQL 9.4 — Railway</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td><code>collabberry-frontend.vercel.app</code> — Vercel</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Bot data store</td>
+<td>Google Sheet <code>1qM9_Ppm…</code></td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>Language model</td>
+<td>Claude Sonnet via <code>api.anthropic.com</code></td>
+<td>PASS</td>
+</tr>
+</tbody></table>
+<p>Re-check at any time with <code>railway run --service bot bun scripts/health-check.ts</code> (read-only, non-destructive).</p>
+<p><strong>Target org:</strong> &quot;Aleksa&quot;, <code>63e3ac6c-3e63-4eec-9ac0-de607adf7d05</code> on Arbitrum One (42161). TeamPoints contract <code>0x635af529462Fe31cb92C639237207eD7cbAF084e</code>.</p>
+<p><strong>Authorized reviewers (final):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Telegram id</th>
+<th>Role</th>
+<th>Plays</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>302836662</code></td>
+<td>admin</td>
+<td>Gustavo (client)</td>
+</tr>
+<tr>
+<td><code>1971913512</code></td>
+<td>admin</td>
+<td>Simon (client-side reviewer)</td>
+</tr>
+</tbody></table>
+<p>Quorum for a proposal is <code>floor(n/2)+1</code> of the pool minus the candidate — so two admins with the candidate excluded gives quorum 2 of 2. The Prosperity Labs admin row was removed on 2026-10-27 as the handoff cleanup; the vendor is no longer in the live reviewer pool or on the admin-command surface (ledger K13; reversible via <code>scripts/add-admin.ts</code> if post-handoff support ever requires it).</p>
+<p><strong>Prod-safety configuration (verified live):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NODE_ENV</code></td>
+<td><code>production</code></td>
+<td>Flips <code>selfReviewAllowed()</code> off</td>
+</tr>
+<tr>
+<td><code>ALLOW_SELF_REVIEW</code></td>
+<td><code>false</code></td>
+<td>The second gate on the self-review bypass</td>
+</tr>
+<tr>
+<td><code>GOOGLE_SHEETS_ID</code></td>
+<td><code>1qM9_Ppm…</code> (prod sheet)</td>
+<td>Dev sheet is a different id and no longer referenced</td>
+</tr>
+<tr>
+<td><code>BOT_TOKEN</code></td>
+<td><code>@Coh3erence_hr_bot</code> (id <code>8811416846</code>)</td>
+<td>Dedicated prod bot, no token collision</td>
+</tr>
+<tr>
+<td><code>BETA_APP_INVITE_URL</code></td>
+<td><code>https://collabberry-frontend.vercel.app/member-sign-up</code></td>
+<td>Explicitly set; matches the deployed frontend route</td>
+</tr>
+<tr>
+<td><code>BETA_APP_INVITE_PARAM</code></td>
+<td><code>invitationToken</code></td>
+<td>Explicitly set; matches the frontend&#39;s query key</td>
+</tr>
+<tr>
+<td><code>BETA_APP_ORG_ID</code></td>
+<td><code>63e3ac6c…</code></td>
+<td>Points at the live Collabberry org on Arbitrum</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Milestones</h2>
+<h3>Milestone 1 — Foundation: COMPLETE</h3>
+<p>Bot scaffolding (grammy + TypeScript + Bun), invite-only application gate, Google Sheets integration across four tabs, Claude integration via tool use, natural-language discovery, and admin commands (<code>/add_opportunity</code>, <code>/list_opportunities</code>, <code>/edit_opportunity</code>, <code>/pause_opportunity</code>, <code>/authorize</code>).</p>
+<h3>Milestone 2 — Core Features: COMPLETE</h3>
+<table>
+<thead>
+<tr>
+<th>Deliverable</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Semantic skill matching (Claude tool use, not substring)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Opportunity ranking and presentation</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Negotiation flow (rate, hours, commitment %)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Settlement likelihood calculation</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Submit proposal for review</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Reviewer DM notifications with inline approve / counter / reject</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Multi-reviewer feedback collection and storage</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Majority quorum + 48h timeout with escalation</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Claude aggregates reviewer feedback into a counter-offer</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Resolution loop (accept / negotiate / walk away)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Reviewer counter reconciled into final agreement terms</td>
+<td>Done</td>
+</tr>
+</tbody></table>
+<h3>Milestone 3 — Integration, Polish &amp; Handoff: COMPLETE</h3>
+<table>
+<thead>
+<tr>
+<th>Deliverable</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>On-chain bridge to Beta App API (agreement created on Arbitrum)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Cooldown and flagging (3-day cooldown after rejection)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>Edge-case hardening (restart recovery, malformed input, counter parsing)</td>
+<td>Done</td>
+</tr>
+<tr>
+<td>End-to-end testing</td>
+<td><strong>Done — 32 / 32 live, campaign closed 2026-10-16; follow-up audit closed 2026-10-23</strong></td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>Done — see §4</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Done — Railway + Vercel</td>
+</tr>
+<tr>
+<td>Client handoff session</td>
+<td>Pending sign-off</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>QA campaign result — 32 / 32</h2>
+<p>Every case was executed against the production environment and recorded with its own timestamp and sheet / on-chain evidence in <code>QA-VERIFICATION.md</code>. The campaign ran from early September through 2026-10-16, with the follow-up audit (FU-1 … FU-7) resolving 2026-10-16 → 2026-10-23.</p>
+<p>Highlights of what the campaign proved live, not in a unit test:</p>
+<ul>
+<li><strong>End-to-end agreement creation on Arbitrum</strong> — discovery → match → negotiation → review → aggregation → acceptance → invite link → wallet signup on the deployed frontend → on-chain agreement id written back. Last re-proven on current code 2026-10-17 with a fresh wallet (<code>0xA07a0ee3…</code>, agreement <code>a_1792257419170</code>, <code>betaAppAgreementId f6a5f2d6-…</code>).</li>
+<li><strong>Genuine multi-party review</strong> — the first real <code>Reject</code> in the project&#39;s history (Nikola on <code>a_1792160941359</code>, 2026-10-16) completed quorum 2 of 3, and §19&#39;s split-verdict suppression was observed live: the aggregator produced no rate, and the candidate&#39;s DM offered Modify / Walk-away but <strong>no Accept button</strong>.</li>
+<li><strong>48h escalation (E6)</strong> — a throwaway proposal left untouched for 48h flipped to <code>escalated</code> and admins were notified, inside the predicted window.</li>
+<li><strong>Retire-on-commit (§23)</strong> — a round-2 revision drafted after Modify did not retire the standing offer until it was submitted; on submit, the original flipped to <code>superseded</code> and <code>supersededBy</code> was set.</li>
+<li><strong>Cooldown gate</strong> — <code>/start</code> from a candidate on cooldown was refused verbatim with the 3-day message, not routed back into matching.</li>
+</ul>
+<h3>Bugs fixed and deployed during the campaign</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Fixed in</th>
+<th>Deployed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>§19</td>
+<td>Split approve / reject let the candidate accept at their own ask</td>
+<td>—</td>
+<td>2026-09-14</td>
+</tr>
+<tr>
+<td>§20</td>
+<td>Aggregated reviewer copy sent to candidate unvalidated</td>
+<td>—</td>
+<td>2026-09-22</td>
+</tr>
+<tr>
+<td>§21</td>
+<td>Selecting an opportunity did nothing if an earlier agreement id lingered</td>
+<td>—</td>
+<td>2026-09-23</td>
+</tr>
+<tr>
+<td>§22</td>
+<td>A leading duration was parsed as the hourly rate</td>
+<td>—</td>
+<td>2026-09-24</td>
+</tr>
+<tr>
+<td>§23</td>
+<td>Modify destroyed the standing offer before new terms existed</td>
+<td><code>6ed1c34</code></td>
+<td>2026-10-08</td>
+</tr>
+<tr>
+<td>§24</td>
+<td><code>review:submit:</code> had no status guard — a stale Submit could resurrect a dead draft</td>
+<td><code>465a0a3</code></td>
+<td>2026-10-08</td>
+</tr>
+<tr>
+<td>§25</td>
+<td><code>/add_opportunity</code> step-by-step mode fell into the contributor gate</td>
+<td>—</td>
+<td>2026-10-06</td>
+</tr>
+<tr>
+<td>§26</td>
+<td>Legacy-Markdown underscore broke the confirmation DM</td>
+<td>—</td>
+<td>2026-10-08 (full audit)</td>
+</tr>
+<tr>
+<td>§27</td>
+<td>Every opportunity edit was rejected by Google (12 values into an 11-column range)</td>
+<td>—</td>
+<td>2026-10-06</td>
+</tr>
+<tr>
+<td>§31</td>
+<td>No match-score floor — the graceful decline was unreachable</td>
+<td>—</td>
+<td>2026-10-08</td>
+</tr>
+<tr>
+<td>§32</td>
+<td>Counter-offer DM misattributed the reviewer&#39;s rate as the candidate&#39;s</td>
+<td><code>baa5290</code></td>
+<td>2026-10-14</td>
+</tr>
+<tr>
+<td>§33</td>
+<td>Reviewer&#39;s &quot;previous ask&quot; quoted an abandoned draft</td>
+<td><code>cbd37fa</code></td>
+<td>2026-10-14</td>
+</tr>
+<tr>
+<td>§34</td>
+<td><code>answerCallbackQuery</code> ran after the handler for <code>review:</code> / <code>resolution:</code> — silent spinner on throw</td>
+<td><code>06c6aa2</code></td>
+<td><strong>2026-10-23</strong></td>
+</tr>
+</tbody></table>
+<p>All thirteen are live on the Railway <code>bot</code> service build <code>2026-10-23T10:18:39Z</code>. Every production change is also recorded with an explicit REVERT or KEEP disposition in <code>docs/QA-REVERT-LEDGER.md</code>.</p>
+<h3>Follow-up audit — FU-1 … FU-7</h3>
+<p>Written as an honest list on 2026-10-16, this was an audit of what the 32 happened not to touch. Six of seven are closed:</p>
+<ul>
+<li><strong>FU-1</strong> — accept → invite → signup → on-chain chain re-proven on current code (2026-10-17).</li>
+<li><strong>FU-2</strong> — first real Reject pressed; §19 observed live.</li>
+<li><strong>FU-3</strong> — §23 retire-on-commit observed in both halves (draft safe, commit retires).</li>
+<li><strong>FU-4</strong> — cooldown gate refused <code>/start</code> with the 3-day message.</li>
+<li><strong>FU-5</strong> — §34 deployed and verified live by hash compare on 2026-10-23.</li>
+<li><strong>FU-6</strong> — the QA tester&#39;s admin row removed; <code>AuthorizedUsers</code> was reset to the three final admins, then the Prosperity Labs row was removed on 2026-10-27 as the handoff cleanup (ledger K13), leaving the two client admins (Gustavo, Simon).</li>
+<li><strong>FU-7</strong> (open, scoped) — see §5.</li>
+</ul>
+<hr>
+<h2>4. Documentation delivered</h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>docs/DELIVERY-STATUS.md</code></td>
+<td>This document — the one-page sign-off summary</td>
+</tr>
+<tr>
+<td><code>QA-VERIFICATION.md</code> (+ <code>.html</code>, <code>.pdf</code>)</td>
+<td>Per-case QA evidence, 32 / 32 result, follow-up audit, client sign-off line</td>
+</tr>
+<tr>
+<td><code>docs/KNOWN-ISSUES-AND-DECISIONS.md</code></td>
+<td>34 issues logged with status and evidence; design decisions explained</td>
+</tr>
+<tr>
+<td><code>docs/QA-REVERT-LEDGER.md</code></td>
+<td>Every production change with its REVERT / KEEP disposition</td>
+</tr>
+<tr>
+<td><code>docs/ARCHITECTURE.md</code></td>
+<td>System overview</td>
+</tr>
+<tr>
+<td><code>docs/CONVERSATION-FLOWS.md</code></td>
+<td>Phase-by-phase walkthrough</td>
+</tr>
+<tr>
+<td><code>docs/BETA-APP-BRIDGE.md</code></td>
+<td>How the bot calls into the Collabberry Beta App to create the on-chain agreement</td>
+</tr>
+<tr>
+<td><code>docs/DEPLOYMENT-RAILWAY.md</code></td>
+<td>Operations runbook: what is where, how to deploy, how to re-check</td>
+</tr>
+<tr>
+<td><code>docs/MANUAL-TEST-PLAN.md</code></td>
+<td>The agreed test plan the campaign ran against</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Known limitations and remaining items</h2>
+<p>Deliberate, accepted limitations of the MVP (full detail in <code>docs/KNOWN-ISSUES-AND-DECISIONS.md</code>):</p>
+<ol>
+<li><strong>&quot;I&#39;ve signed up&quot; is a manual tap.</strong> Nothing polls for signup completion. Tapping before the browser flow finishes silently does nothing. This is the most common point of confusion in a live demo.</li>
+<li><strong>Each end-to-end run needs a fresh wallet.</strong> The backend rejects a second agreement for a wallet that already has one.</li>
+<li><strong>TeamPoints balance shows 0 after hiring.</strong> Minting is a separate admin signature, outside the bot&#39;s scope.</li>
+<li><strong>No per-message bot logging.</strong> State is diagnosed by reading the sheet and backend.</li>
+<li><strong>Google Sheets as the bot data store.</strong> Intentional for MVP so the client can inspect state directly.</li>
+</ol>
+<p><strong>One open follow-up (FU-7), outside the bot&#39;s scope:</strong></p>
+<ul>
+<li><strong>FU-7(a)</strong> The one live retry on 2026-10-17 originally hypothesised a config fallthrough in the invite link; this is now disproved — <code>BETA_APP_INVITE_URL</code> and <code>BETA_APP_INVITE_PARAM</code> are explicitly set on Railway (see §Live environment). The retry&#39;s root cause was not captured during the run; no further occurrence has been observed.</li>
+<li><strong>FU-7(b)</strong> MetaMask warned <em>&quot;this site shows signs of phishing or wallet-draining activity&quot;</em> on the Vercel subdomain. Most likely a false positive on the hosting pattern, but a real contributor would see the same warning. <strong>Owner: client / frontend team.</strong> Serve signup from a custom domain or file a false-positive removal against MetaMask&#39;s <code>eth-phishing-detect</code> list.</li>
+</ul>
+<hr>
+<h2>6. Housekeeping decisions</h2>
+<ol>
+<li><p><strong>Developer admin row — RESOLVED 2026-10-27.</strong> <code>535329585</code> (Aleksa, Prosperity Labs) was removed from <code>AuthorizedUsers</code> as the handoff cleanup. The live reviewer pool is now the two client admins (Gustavo, Simon) only. Recorded as ledger entry K13; reversible via <code>scripts/add-admin.ts</code> if post-handoff support ever requires it.</p>
+</li>
+<li><p><strong>QA-campaign data on the production sheet — OPEN.</strong> Three contributor rows, twelve agreement rows and sixteen review-feedback rows exist on the prod sheet — these are the actual 32 / 32 campaign records (including the on-chain agreement proofs cited above). Options: leave in place as live-run evidence; archive to a backup tab; or zero out so the client starts against an empty roster. A reset script exists (<code>scripts/reset-test-data.ts</code>) and preserves a dated backup. <strong>Deferred to the client&#39;s preference, actionable at any time after sign-off.</strong></p>
+</li>
+</ol>
+<hr>
+<h2>7. Tech stack</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bot framework</td>
+<td>grammy (TypeScript)</td>
+</tr>
+<tr>
+<td>LLM</td>
+<td>Claude Sonnet via <code>@anthropic-ai/sdk</code></td>
+</tr>
+<tr>
+<td>Bot data store</td>
+<td>Google Sheets (googleapis)</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Node/TypeScript + MySQL (Collabberry fork)</td>
+</tr>
+<tr>
+<td>Chain</td>
+<td>Arbitrum One</td>
+</tr>
+<tr>
+<td>Hosting</td>
+<td>Railway (bot, backend, DB), Vercel (frontend)</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Bun</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Next steps</h2>
+<ol>
+<li><strong>Client review of this document plus <code>QA-VERIFICATION.pdf</code>.</strong></li>
+<li><strong>Client countersigns <code>QA-VERIFICATION.md</code> §7</strong> (the sign-off line) and <code>docs/DELIVERY-STATUS.md</code> is treated as the delivery statement.</li>
+<li><strong>Payment initiation per the engagement terms.</strong></li>
+<li><strong>Client&#39;s call on the QA-campaign data</strong> (§6 item 2) — leave as live-run evidence, archive, or wipe. Actionable at any time; not a sign-off blocker.</li>
+<li><strong>Post-handoff:</strong> operations runbook is <code>docs/DEPLOYMENT-RAILWAY.md</code>; incident paths are logged with sheet-read scripts and <code>railway logs --service bot</code>.</li>
+</ol>
+
+<div class="doc-footer">
+  Collabberry HR Agent — Delivery Status. Generated 2026-10-27.
+</div>
+</body>
+</html>
