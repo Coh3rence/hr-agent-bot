@@ -1,4 +1,4 @@
-HR Agent Bot Source Available License v1.0
+HR Agent Bot Source Available License v1.1
 
 Copyright (c) 2025 Prosperity Labs
 
@@ -28,10 +28,21 @@ toward commercial advantage or monetary compensation. This includes:
   - Internal use by open-source communities and DAOs that do not charge
     third parties for access to the Software or its functionality
 
+"Internal Use" means use of the Software by You, whether You are an
+individual, a non-profit, a DAO, or a for-profit legal entity, solely to
+operate Your own organization or project, including onboarding, skill
+matching, coordinating, and negotiating agreements with Your own members,
+contributors, contractors, employees, and candidates, provided that the
+Software and its functionality are not offered, sold, licensed, or made
+available as a product or hosted service to other organizations. Interaction
+with the Software by the people listed above, as part of their relationship
+with You, is Internal Use. Your legal form, revenue model, or issuance of
+tokens does not, by itself, make a use other than Internal Use.
+
 "Commercial Use" means any use where the Software, or a product substantially
 derived from the Software, is offered to third parties for a fee, as a hosted
 service, as part of a paid product, or in any context primarily intended for
-commercial advantage.
+commercial advantage. Internal Use is not Commercial Use.
 
 "You" means the individual or legal entity exercising rights under this License.
 
@@ -40,8 +51,9 @@ commercial advantage.
 Subject to the conditions below, Prosperity Labs grants You a worldwide,
 royalty-free, non-exclusive license to:
 
-  a) Use, copy, and run the Software for Non-Commercial Use;
-  b) Modify the Software and create derivative works for Non-Commercial Use;
+  a) Use, copy, and run the Software for Non-Commercial Use or Internal Use;
+  b) Modify the Software and create derivative works for Non-Commercial Use
+     or Internal Use;
   c) Distribute copies of the Software or derivative works under the same
      license terms, provided this license notice is retained in full.
 
