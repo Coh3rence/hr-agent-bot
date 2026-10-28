@@ -199,9 +199,10 @@ See [docs/DELIVERY-STATUS.md](docs/DELIVERY-STATUS.md) for the full breakdown. I
 
 ## License
 
-This project is licensed under the **HR Agent Bot Source Available License v1.0**. See [LICENSE](LICENSE) for full terms.
+This project is licensed under the **HR Agent Bot Source Available License v1.1**. See [LICENSE](LICENSE) for full terms.
 
 In short:
 - Free to use for personal projects, research, and non-commercial DAO operations.
-- Commercial use (e.g. offering this as a hosted SaaS product to third parties) requires written permission.
+- Free for any organization (including for-profit companies and token-issuing projects) to use internally to run its own team, e.g. onboarding, skill matching and agreement negotiation with its own members and contributors.
+- Commercial use (e.g. offering this as a product or hosted SaaS to other organizations) requires written permission.
 - Third-party components — including the [Collabberry](https://github.com/collabberry/) platform APIs this bot integrates with — retain their own licenses (MIT).
